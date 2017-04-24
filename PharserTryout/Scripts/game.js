@@ -9,7 +9,7 @@ var SimpleGame = (function () {
     };
     SimpleGame.prototype.moveTank = function (e) {
         var delta = e.ctrlKey ? 5 : 1;
-        switch (e.key) {
+        switch (e.event.key) {
             case "w":
                 this.tank.position.add(0, -1 * delta);
                 return;
@@ -54,4 +54,3 @@ var SimpleGame = (function () {
 window.onload = function () {
     var game = new SimpleGame();
 };
-//# sourceMappingURL=game.js.map

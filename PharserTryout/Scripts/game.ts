@@ -17,11 +17,9 @@
         var loader = this.game.load.image("tank", "../Resources/tank.png");
     }
 
-    moveTank(e: KeyboardEvent) {
-
+    moveTank(e: Phaser.Key) {
         let delta = e.ctrlKey ? 5 : 1;
-
-        switch (e.key) {
+        switch (e.event.key) {
             case "w":
                 this.tank.position.add(0, -1 * delta);
                 return;
