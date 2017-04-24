@@ -8,6 +8,7 @@ var SimpleGame = (function () {
     }
     SimpleGame.prototype.preload = function () {
         this.game.load.image("tank", "../Resources/tank.png");
+        this.game.load.image("bullet", "../Resources/bullet.png");
         this.game.stage.disableVisibilityChange = true;
     };
     SimpleGame.prototype.create = function () {
@@ -18,6 +19,12 @@ var SimpleGame = (function () {
         this.tank.body.collideWorldBounds = true;
         this.tank.body.bounce.y = 1;
         this.tank.body.bounce.x = 0.5;
+        this.bullets = this.game.add.group();
+        this.bullets.enableBody = true;
+        this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
+        this.bullets.createMultiple(30, "bullet");
+        this.bullets.setAll("checkWorldBounds", true);
+        this.bullets.setAll("outOfBoundsKill", true);
         this.W = this.game.input.keyboard.addKey(Phaser.Keyboard.W);
         this.A = this.game.input.keyboard.addKey(Phaser.Keyboard.A);
         this.S = this.game.input.keyboard.addKey(Phaser.Keyboard.S);
@@ -31,6 +38,8 @@ var SimpleGame = (function () {
         this.A.onUp.add(SimpleGame.prototype.stopTank, this);
         this.S.onUp.add(SimpleGame.prototype.stopTank, this);
         this.D.onUp.add(SimpleGame.prototype.stopTank, this);
+        this.P = this.game.input.keyboard.addKey(Phaser.Keyboard.P);
+        this.P.onDown.add(SimpleGame.prototype.fireGun, this);
     };
     SimpleGame.prototype.update = function () {
         switch (this.movingDirection) {
@@ -94,6 +103,21 @@ var SimpleGame = (function () {
                 this.movingDirection = Directions.Right;
                 return;
         }
+    };
+    SimpleGame.prototype.fireGun = function () {
+        var randomAngleOffset = (Math.random() - 0.5) * 0.2;
+        var halfLength = this.tank.height / 2;
+        var theta = this.tank.angle / 360 * 6.283 + randomAngleOffset;
+        var xOffset = Math.sin(theta) * halfLength;
+        var yOffset = -1 * Math.cos(theta) * halfLength;
+        var bullet = this.bullets.getFirstDead();
+        bullet.anchor.set(0.5, 0.5);
+        bullet.angle = this.tank.angle;
+        bullet.reset(this.tank.x + xOffset, this.tank.y + yOffset);
+        var longway = 10000;
+        xOffset = Math.sin(theta) * longway;
+        yOffset = -1 * Math.cos(theta) * longway;
+        this.game.physics.arcade.moveToXY(bullet, this.tank.x + xOffset, this.tank.y + yOffset, 1000);
     };
     return SimpleGame;
 }());
