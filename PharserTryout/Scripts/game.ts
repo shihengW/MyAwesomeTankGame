@@ -1,4 +1,13 @@
-﻿class SimpleGame {
+﻿// Road map:
+// 1. Collision, physics and move
+//   1.1. Sand bag
+//   1.2. X direction
+// 2. Animation
+//   2.1. Sprite sheet.
+// 3. Gun towner controlled by mouse
+// ----------------
+// 4. Multi-users
+class SimpleGame {
     game: Phaser.Game;
     tank: Tank;
 
@@ -107,11 +116,12 @@ class Tank {
         // Tank physics.
         game.physics.enable(this.tank, Phaser.Physics.ARCADE);
         this.tank.body.collideWorldBounds = true;
-        this.tank.body.bounce.y = 1;
+        this.tank.body.bounce.y = 0.5;
         this.tank.body.bounce.x = 0.5;
-
+        
         // Create bullets.
         this.bullets = game.add.group();
+        // game.physics.enable(this.bullets, Phaser.Physics.ARCADE);
         this.bullets.enableBody = true;
         this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
         this.bullets.createMultiple(30, bulletName);

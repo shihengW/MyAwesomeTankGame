@@ -1,3 +1,12 @@
+// Road map:
+// 1. Collision, physics and move
+//   1.1. Sand bag
+//   1.2. X direction
+// 2. Animation
+//   2.1. Sprite sheet.
+// 3. Gun towner controlled by mouse
+// ----------------
+// 4. Multi-users
 var SimpleGame = (function () {
     function SimpleGame() {
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
@@ -95,10 +104,11 @@ var Tank = (function () {
         // Tank physics.
         game.physics.enable(this.tank, Phaser.Physics.ARCADE);
         this.tank.body.collideWorldBounds = true;
-        this.tank.body.bounce.y = 1;
+        this.tank.body.bounce.y = 0.5;
         this.tank.body.bounce.x = 0.5;
         // Create bullets.
         this.bullets = game.add.group();
+        // game.physics.enable(this.bullets, Phaser.Physics.ARCADE);
         this.bullets.enableBody = true;
         this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
         this.bullets.createMultiple(30, bulletName);
@@ -164,4 +174,3 @@ var Tank = (function () {
     };
     return Tank;
 }());
-//# sourceMappingURL=game.js.map
