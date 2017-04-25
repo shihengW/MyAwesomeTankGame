@@ -1,5 +1,3 @@
-var slowSpeed = 3;
-var fastSpeed = 6;
 var SimpleGame = (function () {
     function SimpleGame() {
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
@@ -12,112 +10,67 @@ var SimpleGame = (function () {
         this.game.stage.disableVisibilityChange = true;
     };
     SimpleGame.prototype.create = function () {
-        this.tank = this.game.add.sprite(this.game.width / 2, this.game.height / 2, "tank");
-        this.tank.anchor.set(0.5, 0.5);
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        this.game.physics.enable(this.tank, Phaser.Physics.ARCADE);
-        this.tank.body.collideWorldBounds = true;
-        this.tank.body.bounce.y = 1;
-        this.tank.body.bounce.x = 0.5;
-        this.bullets = this.game.add.group();
-        this.bullets.enableBody = true;
-        this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this.bullets.createMultiple(30, "bullet");
-        this.bullets.setAll("checkWorldBounds", true);
-        this.bullets.setAll("outOfBoundsKill", true);
-        this.W = this.game.input.keyboard.addKey(Phaser.Keyboard.W);
-        this.A = this.game.input.keyboard.addKey(Phaser.Keyboard.A);
-        this.S = this.game.input.keyboard.addKey(Phaser.Keyboard.S);
-        this.D = this.game.input.keyboard.addKey(Phaser.Keyboard.D);
-        this.game.input.keyboard.addKeyCapture(Phaser.Keyboard.W);
-        this.W.onDown.add(SimpleGame.prototype.moveTank, this);
-        this.A.onDown.add(SimpleGame.prototype.moveTank, this);
-        this.S.onDown.add(SimpleGame.prototype.moveTank, this);
-        this.D.onDown.add(SimpleGame.prototype.moveTank, this);
-        this.W.onUp.add(SimpleGame.prototype.stopTank, this);
-        this.A.onUp.add(SimpleGame.prototype.stopTank, this);
-        this.S.onUp.add(SimpleGame.prototype.stopTank, this);
-        this.D.onUp.add(SimpleGame.prototype.stopTank, this);
-        this.P = this.game.input.keyboard.addKey(Phaser.Keyboard.P);
-        this.P.onDown.add(SimpleGame.prototype.fireGun, this);
+        this.tank = new Tank(this.game, "tank", "bullet");
+        // Inputs.
+        var W = this.game.input.keyboard.addKey(Phaser.Keyboard.W);
+        var A = this.game.input.keyboard.addKey(Phaser.Keyboard.A);
+        var S = this.game.input.keyboard.addKey(Phaser.Keyboard.S);
+        var D = this.game.input.keyboard.addKey(Phaser.Keyboard.D);
+        var P = this.game.input.keyboard.addKey(Phaser.Keyboard.P);
+        // Keydown
+        W.onDown.add(SimpleGame.prototype.moveTank, this);
+        A.onDown.add(SimpleGame.prototype.moveTank, this);
+        S.onDown.add(SimpleGame.prototype.moveTank, this);
+        D.onDown.add(SimpleGame.prototype.moveTank, this);
+        P.onDown.add(SimpleGame.prototype.fireGun, this);
+        // Keyup
+        W.onUp.add(SimpleGame.prototype.stopTank, this);
+        A.onUp.add(SimpleGame.prototype.stopTank, this);
+        S.onUp.add(SimpleGame.prototype.stopTank, this);
+        D.onUp.add(SimpleGame.prototype.stopTank, this);
     };
     SimpleGame.prototype.update = function () {
-        switch (this.movingDirection) {
-            case Directions.None:
-                return;
-            case Directions.Up:
-                this.tank.position.add(0, this.speedUp ? -1 * fastSpeed : -1 * slowSpeed);
-                return;
-            case Directions.Down:
-                this.tank.position.add(0, this.speedUp ? fastSpeed : slowSpeed);
-                return;
-            case Directions.Left:
-                this.tank.position.add(this.speedUp ? -1 * fastSpeed : -1 * slowSpeed, 0);
-                return;
-            case Directions.Right:
-                this.tank.position.add(this.speedUp ? fastSpeed : slowSpeed, 0);
-                return;
-            default:
-        }
+        this.tank.tankMove();
     };
     SimpleGame.prototype.stopTank = function (e) {
         var shouldStop = false;
-        if (e.ctrlKey) {
-            this.speedUp = false;
-        }
         switch (e.event.key) {
             case "w":
-                shouldStop = this.movingDirection === Directions.Up;
+                shouldStop = this.tank.getDirection() === Directions.Up;
                 break;
             case "a":
-                shouldStop = this.movingDirection === Directions.Left;
+                shouldStop = this.tank.getDirection() === Directions.Left;
                 break;
             case "s":
-                shouldStop = this.movingDirection === Directions.Down;
+                shouldStop = this.tank.getDirection() === Directions.Down;
                 break;
             case "d":
-                shouldStop = this.movingDirection === Directions.Right;
+                shouldStop = this.tank.getDirection() === Directions.Right;
                 break;
         }
         if (shouldStop) {
-            this.movingDirection = Directions.None;
+            this.tank.tankEndMove();
         }
     };
     SimpleGame.prototype.moveTank = function (e) {
-        this.speedUp = e.ctrlKey;
         switch (e.event.key) {
             case "w":
-                this.tank.angle = 0;
-                this.movingDirection = Directions.Up;
+                this.tank.tankStartMove(Directions.Up);
                 return;
             case "a":
-                this.tank.angle = -90;
-                this.movingDirection = Directions.Left;
+                this.tank.tankStartMove(Directions.Left);
                 return;
             case "s":
-                this.tank.angle = 180;
-                this.movingDirection = Directions.Down;
+                this.tank.tankStartMove(Directions.Down);
                 return;
             case "d":
-                this.tank.angle = 90;
-                this.movingDirection = Directions.Right;
+                this.tank.tankStartMove(Directions.Right);
                 return;
         }
     };
     SimpleGame.prototype.fireGun = function () {
-        var randomAngleOffset = (Math.random() - 0.5) * 0.2;
-        var halfLength = this.tank.height / 2;
-        var theta = this.tank.angle / 360 * 6.283 + randomAngleOffset;
-        var xOffset = Math.sin(theta) * halfLength;
-        var yOffset = -1 * Math.cos(theta) * halfLength;
-        var bullet = this.bullets.getFirstDead();
-        bullet.anchor.set(0.5, 0.5);
-        bullet.angle = this.tank.angle;
-        bullet.reset(this.tank.x + xOffset, this.tank.y + yOffset);
-        var longway = 10000;
-        xOffset = Math.sin(theta) * longway;
-        yOffset = -1 * Math.cos(theta) * longway;
-        this.game.physics.arcade.moveToXY(bullet, this.tank.x + xOffset, this.tank.y + yOffset, 1000);
+        this.tank.tankFire();
     };
     return SimpleGame;
 }());
@@ -132,4 +85,83 @@ var Directions;
     Directions[Directions["Right"] = 3] = "Right";
     Directions[Directions["None"] = 4] = "None";
 })(Directions || (Directions = {}));
+var Tank = (function () {
+    function Tank(game, spriteName, bulletName) {
+        this.tankSpeed = 3;
+        this.ownerGame = game;
+        // Create tank.
+        this.tank = game.add.sprite(game.width / 2, game.height / 2, spriteName);
+        this.tank.anchor.set(0.5, 0.5);
+        // Tank physics.
+        game.physics.enable(this.tank, Phaser.Physics.ARCADE);
+        this.tank.body.collideWorldBounds = true;
+        this.tank.body.bounce.y = 1;
+        this.tank.body.bounce.x = 0.5;
+        // Create bullets.
+        this.bullets = game.add.group();
+        this.bullets.enableBody = true;
+        this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
+        this.bullets.createMultiple(30, bulletName);
+        this.bullets.setAll("checkWorldBounds", true);
+        this.bullets.setAll("outOfBoundsKill", true);
+    }
+    Tank.prototype.tankStartMove = function (d) {
+        this.direction = d;
+        switch (d) {
+            case Directions.Up:
+                this.tank.angle = 0;
+                return;
+            case Directions.Left:
+                this.tank.angle = -90;
+                return;
+            case Directions.Down:
+                this.tank.angle = 180;
+                return;
+            case Directions.Right:
+                this.tank.angle = 90;
+                return;
+        }
+    };
+    Tank.prototype.getDirection = function () {
+        return this.direction;
+    };
+    Tank.prototype.tankEndMove = function () {
+        this.direction = Directions.None;
+    };
+    Tank.prototype.tankMove = function () {
+        switch (this.direction) {
+            case Directions.None:
+                return;
+            case Directions.Up:
+                this.tank.position.add(0, -1 * this.tankSpeed);
+                return;
+            case Directions.Down:
+                this.tank.position.add(0, this.tankSpeed);
+                return;
+            case Directions.Left:
+                this.tank.position.add(-1 * this.tankSpeed, 0);
+                return;
+            case Directions.Right:
+                this.tank.position.add(this.tankSpeed, 0);
+                return;
+            default:
+        }
+    };
+    Tank.prototype.tankFire = function () {
+        var randomAngleOffset = (Math.random() - 0.5) * 0.2;
+        var halfLength = this.tank.height / 2;
+        var theta = this.tank.angle / 360 * 6.283 + randomAngleOffset;
+        var xOffset = Math.sin(theta) * halfLength;
+        var yOffset = -1 * Math.cos(theta) * halfLength;
+        var bullet = this.bullets.getFirstDead();
+        bullet.anchor.set(0.5, 0.5);
+        bullet.angle = this.tank.angle;
+        bullet.reset(this.tank.x + xOffset, this.tank.y + yOffset);
+        var longway = 10000;
+        xOffset = Math.sin(theta) * longway;
+        yOffset = -1 * Math.cos(theta) * longway;
+        this.ownerGame.physics.arcade.moveToXY(bullet, this.tank.x + xOffset, this.tank.y + yOffset, 1000);
+    };
+    return Tank;
+}());
 //# sourceMappingURL=game.js.map
