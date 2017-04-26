@@ -1,4 +1,4 @@
-﻿// Road map:
+// Road map:
 // [Check] 1. Collision, physics and move
 //   1.1. Sand bag
 //   1.2. X direction
@@ -14,50 +14,57 @@ const bulletName: string = "bullet";
 const particleName: string = "particle";
 
 class SimpleGame {
-
-    private game: Phaser.Game;
-    private tank: Tank;
+    game: Phaser.Game;
+    tank: Tank;
+    enemy: Phaser.Sprite;
 
     constructor() {
-        this.game = new Phaser.Game(800, 600, Phaser.AUTO, "content", {
-             create: this.create, preload: this.preload, update: this.update
+        this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
+            create: this.create, preload: this.preload, update: this.update
         });
     }
 
     preload() {
-        this.game.load.image(tankbodyName, "../Resources/tankbody.png");
-        this.game.load.image(guntowerName, "../Resources/guntower.png");
-        this.game.load.image(bulletName, "../Resources/bullet.png");
+        this.game.load.image("tank", "../resources/tank.png");
+        this.game.load.image(bulletName, "../resources/bullet.png");
+        this.game.load.image(particleName, "../resources/particle.png");
+        this.game.load.image(tankbodyName, "../resources/tankbody.png");
+        this.game.load.image(guntowerName, "../resources/guntower.png");
         this.game.stage.disableVisibilityChange = true;
     }
 
     create() {
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         this.tank = new Tank(this.game);
-
+        
+        // Add enemy.
+        this.enemy = this.game.add.sprite(this.game.width, this.game.height / 2 - 50, "tank");
+        this.game.physics.arcade.enable(this.enemy);    
+        this.enemy.body.collideWorldBounds = true;
+        this.enemy.body.bounce.x = 1;
+        this.enemy.body.bounce.y = 1;
+        this.enemy.body.mass = 100;
+        this.game.physics.arcade.accelerateToXY(this.enemy, this.game.width / 2, this.game.height / 2 - 50, 100);
+        
         // Inputs.
-        let W = this.game.input.keyboard.addKey(Phaser.Keyboard.W);
-        let A = this.game.input.keyboard.addKey(Phaser.Keyboard.A);
-        let S = this.game.input.keyboard.addKey(Phaser.Keyboard.S);
-        let D = this.game.input.keyboard.addKey(Phaser.Keyboard.D);
-
-        // Keydown
-        W.onDown.add(SimpleGame.prototype.moveTank, this);
-        A.onDown.add(SimpleGame.prototype.moveTank, this);
-        S.onDown.add(SimpleGame.prototype.moveTank, this);
-        D.onDown.add(SimpleGame.prototype.moveTank, this);
-
-        // Keyup
-        W.onUp.add(SimpleGame.prototype.stopTank, this);
-        A.onUp.add(SimpleGame.prototype.stopTank, this);
-        S.onUp.add(SimpleGame.prototype.stopTank, this);
-        D.onUp.add(SimpleGame.prototype.stopTank, this);
+        SimpleGame.registerKey(this, Phaser.Keyboard.W, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKey(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKey(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
     }
 
+    // Don't know how to make this more acurate, actually, this is not a SimpleGame.
+    static registerKey(self: SimpleGame, key: number, keydownHandler: any, keyupHandler?: any) : Phaser.Key {
+        let realKey = self.game.input.keyboard.addKey(key);
+        if (keydownHandler != null) realKey.onDown.add(keydownHandler, self);
+        if (keyupHandler != null) realKey.onUp.add(keyupHandler, self);
+        // I don't think the output is going to be used.
+        return realKey;
+    }
 
-    private counter: number = 0;
     update() {
         this.tank.tankUpdate();
+        this.tank.checkCollide(this.enemy);
         if (this.game.input.activePointer.isDown) {
             this.tank.tankFire();
             return;
@@ -119,22 +126,25 @@ class Tank {
 
     constructor(game: Phaser.Game) {
         this.ownerGame = game;
+
         // Creat tank.
         this.tank = game.add.group(game, "tank", true, true, Phaser.Physics.ARCADE);
         this.tank.position.set(game.width / 2, game.height / 2);
 
-        // Seperate tank body and gun tower.
+        // Seperate tank body and gun tower.           
         this.tankbody = this.tank.create(0, 0, tankbodyName);
         this.guntower = this.tank.create(0, 0, guntowerName);
-
         this.tank.setAll("anchor", new Phaser.Point(0.5, 0.5));
+
+        // NOT Only enable the physics for tankbody.
+        // this.ownerGame.physics.arcade.enable(this.tankbody);
         this.tankbody.body.collideWorldBounds = true;
         this.tankbody.body.bounce.y = 1;
         this.tankbody.body.bounce.x = 1;
+        this.tankbody.body.mass = 70;
         
         // Create bullets.
         this.bullets = game.add.group();
-        // game.physics.enable(this.bullets, Phaser.Physics.ARCADE);
         this.bullets.enableBody = true;
         this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
         this.bullets.createMultiple(30, bulletName);
@@ -170,11 +180,15 @@ class Tank {
     }
 
     tankUpdate() {
-        // First, move gun tower to point to pointer.
+        // First, move gun tower to point to mouse.
         const angle: number = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, new Phaser.Point(this.tank.x, this.tank.y));
         this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
 
         // Second, move the tank.
+        if (this.direction == Directions.None) {
+            this.tankbody.body.velocity.x = 0;
+            this.tankbody.body.velocity.y = 0;
+        }
         switch (this.direction) {
             case Directions.None:
                 return;
@@ -192,21 +206,25 @@ class Tank {
                 return;
             default:
         }
+
+        // Finally, force to coordinate the guntower and tankbody.
+        // TODO: Find a smarter way to do this.
+        this.guntower.position = this.tankbody.position;        
     }
 
     private nextFire: number = 0;
     private fireRate: number = 200;
 
     tankFire() {
-
         if (this.ownerGame.time.now < this.nextFire || this.bullets.countDead() <= 0) {
             return;
         }
 
+        // Set the cooldown time.
         this.nextFire = this.ownerGame.time.now + this.fireRate;
 
         // Get a random offset.
-        const randomAngleOffset: number = (Math.random() - 0.5) * 0.4;
+        const randomAngleOffset: number = (Math.random() - 0.5) * 0.3;
         const theta: number = this.guntower.angle / 360 * 6.283 + randomAngleOffset;
 
         // Bullet start position offset.
@@ -219,11 +237,33 @@ class Tank {
         bullet.anchor.set(0.5, 0.5);
         bullet.angle = this.guntower.angle;
 
-        bullet.reset(this.tank.x + xOffset, this.tank.y + yOffset);
+        // Get the position of the gun tower.
+        let guntowerPosition = this.guntower.body.position;
+
+        bullet.reset(guntowerPosition.x + xOffset, guntowerPosition.y + yOffset);
 
         const longway: number = 10000;
         xOffset = Math.sin(theta) * longway;
         yOffset = -1 * Math.cos(theta) * longway;
-        this.ownerGame.physics.arcade.moveToXY(bullet, this.tank.x + xOffset, this.tank.y + yOffset, 1000);
+        this.ownerGame.physics.arcade.moveToXY(bullet, 
+            guntowerPosition.x + xOffset, guntowerPosition.y + yOffset, 1000);
+    }
+
+    checkCollide(another: Phaser.Sprite) {
+        let self = this;
+
+        this.ownerGame.physics.arcade.collide(this.tankbody, another);
+        this.bullets.forEachAlive((item:Phaser.Sprite) => {
+            self.ownerGame.physics.arcade.collide(item, another, 
+                (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.BulletHit(bullet, another, self.ownerGame));
+        }, this);
+    }
+
+    static BulletHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {
+        bullet.kill();
+        // Now we are creating the particle emitter, centered to the world
+        let emitter = game.add.emitter((bullet.x + another.centerX) / 2, (bullet.y + another.centerY) / 2);
+        emitter.makeParticles(particleName, 0, 50, false, false);
+        emitter.explode(300, 50);
     }
 }
