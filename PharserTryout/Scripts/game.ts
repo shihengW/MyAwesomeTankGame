@@ -1,4 +1,4 @@
-// Road map:
+﻿// Road map:
 // [Check] 1. Collision, physics and move
 //   1.1. Sand bag
 //   1.2. X direction
@@ -8,6 +8,14 @@
 // [Working] 3. Gun towner controlled by mouse
 // ----------------
 // 4. Multi-users
+
+window.onload = () => {
+    var game = new SimpleGame();
+};
+
+enum Directions { Up, Down, Left, Right, None }
+
+const sandbagName: string = "sandbag";
 const tankbodyName: string = "tankbody";
 const guntowerName: string = "guntower";
 const bulletName: string = "bullet";
@@ -16,7 +24,7 @@ const particleName: string = "particle";
 class SimpleGame {
     game: Phaser.Game;
     tank: Tank;
-    enemy: Phaser.Sprite;
+    sandbag: Phaser.Sprite;
 
     constructor() {
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
@@ -25,7 +33,7 @@ class SimpleGame {
     }
 
     preload() {
-        this.game.load.image("tank", "../resources/tank.png");
+        this.game.load.image(sandbagName, "../resources/tank.png");
         this.game.load.image(bulletName, "../resources/bullet.png");
         this.game.load.image(particleName, "../resources/particle.png");
         this.game.load.image(tankbodyName, "../resources/tankbody.png");
@@ -38,19 +46,30 @@ class SimpleGame {
         this.tank = new Tank(this.game);
         
         // Add enemy.
-        this.enemy = this.game.add.sprite(this.game.width, this.game.height / 2 - 50, "tank");
-        this.game.physics.arcade.enable(this.enemy);    
-        this.enemy.body.collideWorldBounds = true;
-        this.enemy.body.bounce.x = 1;
-        this.enemy.body.bounce.y = 1;
-        this.enemy.body.mass = 100;
-        this.game.physics.arcade.accelerateToXY(this.enemy, this.game.width / 2, this.game.height / 2 - 50, 100);
+        this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
         
         // Inputs.
         SimpleGame.registerKey(this, Phaser.Keyboard.W, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+    }
+
+    static createSandbagAndMakeItMove(game: Phaser.Game) : Phaser.Sprite {
+        let sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
+
+        // Setup
+        game.physics.arcade.enable(sandbag);
+        sandbag.body.collideWorldBounds = true;
+        sandbag.body.bounce.x = 1;
+        sandbag.body.bounce.y = 1;
+        sandbag.body.mass = 100;
+        sandbag.anchor.set(0.5, 0.5);
+
+        // Make it run.
+        // TODO: Should find a way to make it run randomly.
+        game.physics.arcade.accelerateToXY(sandbag, game.width / 2, game.height / 2 - 50, 100);
+        return sandbag;
     }
 
     // Don't know how to make this more acurate, actually, this is not a SimpleGame.
@@ -63,8 +82,12 @@ class SimpleGame {
     }
 
     update() {
+        // First, update tank itself.
         this.tank.tankUpdate();
-        this.tank.checkCollide(this.enemy);
+        // Second, update the relationship between tank and sandbag.
+        this.tank.checkCollide(this.sandbag);
+
+        // Finally, fire if it should.
         if (this.game.input.activePointer.isDown) {
             this.tank.tankFire();
             return;
@@ -108,12 +131,6 @@ class SimpleGame {
     }
 }
 
-window.onload = () => {
-    var game = new SimpleGame();
-};
-
-enum Directions { Up, Down, Left, Right, None }
-
 class Tank {
     private tank: Phaser.Group;
     private guntower: Phaser.Sprite;
@@ -122,7 +139,7 @@ class Tank {
     private bullets: Phaser.Group;
     private ownerGame: Phaser.Game;
     private tankSpeed: number = 3;
-    private direction: number;
+    private direction: Directions = Directions.None;
 
     constructor(game: Phaser.Game) {
         this.ownerGame = game;
@@ -181,14 +198,15 @@ class Tank {
 
     tankUpdate() {
         // First, move gun tower to point to mouse.
-        const angle: number = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, new Phaser.Point(this.tank.x, this.tank.y));
+        const angle: number = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
         this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
 
         // Second, move the tank.
-        if (this.direction == Directions.None) {
+        if (this.direction === Directions.None) {
             this.tankbody.body.velocity.x = 0;
             this.tankbody.body.velocity.y = 0;
         }
+
         switch (this.direction) {
             case Directions.None:
                 return;
@@ -224,8 +242,8 @@ class Tank {
         this.nextFire = this.ownerGame.time.now + this.fireRate;
 
         // Get a random offset.
-        const randomAngleOffset: number = (Math.random() - 0.5) * 0.3;
-        const theta: number = this.guntower.angle / 360 * 6.283 + randomAngleOffset;
+        const randomAngleOffset: number = (Math.random() - 0.5) * 0;
+        const theta: number = Phaser.Math.degToRad(this.guntower.angle) + randomAngleOffset;
 
         // Bullet start position offset.
         const halfLength: number = this.guntower.height / 2;
@@ -237,8 +255,8 @@ class Tank {
         bullet.anchor.set(0.5, 0.5);
         bullet.angle = this.guntower.angle;
 
-        // Get the position of the gun tower.
-        let guntowerPosition = this.guntower.body.position;
+        // Get the position of the tank.
+        let guntowerPosition = this.tankbody.body.center;
 
         bullet.reset(guntowerPosition.x + xOffset, guntowerPosition.y + yOffset);
 
@@ -262,7 +280,7 @@ class Tank {
     static BulletHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
-        let emitter = game.add.emitter((bullet.x + another.centerX) / 2, (bullet.y + another.centerY) / 2);
+        let emitter = game.add.emitter((bullet.x + another.x) / 2, (bullet.y + another.y) / 2);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
     }

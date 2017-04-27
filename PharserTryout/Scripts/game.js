@@ -8,44 +8,77 @@
 // [Working] 3. Gun towner controlled by mouse
 // ----------------
 // 4. Multi-users
+window.onload = function () {
+    var game = new SimpleGame();
+};
+var Directions;
+(function (Directions) {
+    Directions[Directions["Up"] = 0] = "Up";
+    Directions[Directions["Down"] = 1] = "Down";
+    Directions[Directions["Left"] = 2] = "Left";
+    Directions[Directions["Right"] = 3] = "Right";
+    Directions[Directions["None"] = 4] = "None";
+})(Directions || (Directions = {}));
+var sandbagName = "sandbag";
 var tankbodyName = "tankbody";
 var guntowerName = "guntower";
 var bulletName = "bullet";
 var particleName = "particle";
 var SimpleGame = (function () {
     function SimpleGame() {
-        this.counter = 0;
-        this.game = new Phaser.Game(800, 600, Phaser.AUTO, "content", {
+        this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
     }
     SimpleGame.prototype.preload = function () {
-        this.game.load.image(tankbodyName, "../Resources/tankbody.png");
-        this.game.load.image(guntowerName, "../Resources/guntower.png");
-        this.game.load.image(bulletName, "../Resources/bullet.png");
+        this.game.load.image(sandbagName, "../resources/tank.png");
+        this.game.load.image(bulletName, "../resources/bullet.png");
+        this.game.load.image(particleName, "../resources/particle.png");
+        this.game.load.image(tankbodyName, "../resources/tankbody.png");
+        this.game.load.image(guntowerName, "../resources/guntower.png");
         this.game.stage.disableVisibilityChange = true;
     };
     SimpleGame.prototype.create = function () {
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         this.tank = new Tank(this.game);
+        // Add enemy.
+        this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
         // Inputs.
-        var W = this.game.input.keyboard.addKey(Phaser.Keyboard.W);
-        var A = this.game.input.keyboard.addKey(Phaser.Keyboard.A);
-        var S = this.game.input.keyboard.addKey(Phaser.Keyboard.S);
-        var D = this.game.input.keyboard.addKey(Phaser.Keyboard.D);
-        // Keydown
-        W.onDown.add(SimpleGame.prototype.moveTank, this);
-        A.onDown.add(SimpleGame.prototype.moveTank, this);
-        S.onDown.add(SimpleGame.prototype.moveTank, this);
-        D.onDown.add(SimpleGame.prototype.moveTank, this);
-        // Keyup
-        W.onUp.add(SimpleGame.prototype.stopTank, this);
-        A.onUp.add(SimpleGame.prototype.stopTank, this);
-        S.onUp.add(SimpleGame.prototype.stopTank, this);
-        D.onUp.add(SimpleGame.prototype.stopTank, this);
+        SimpleGame.registerKey(this, Phaser.Keyboard.W, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKey(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKey(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+    };
+    SimpleGame.createSandbagAndMakeItMove = function (game) {
+        var sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
+        // Setup
+        game.physics.arcade.enable(sandbag);
+        sandbag.body.collideWorldBounds = true;
+        sandbag.body.bounce.x = 1;
+        sandbag.body.bounce.y = 1;
+        sandbag.body.mass = 100;
+        sandbag.anchor.set(0.5, 0.5);
+        // Make it run.
+        // TODO: Should find a way to make it run randomly.
+        game.physics.arcade.accelerateToXY(sandbag, game.width / 2, game.height / 2 - 50, 100);
+        return sandbag;
+    };
+    // Don't know how to make this more acurate, actually, this is not a SimpleGame.
+    SimpleGame.registerKey = function (self, key, keydownHandler, keyupHandler) {
+        var realKey = self.game.input.keyboard.addKey(key);
+        if (keydownHandler != null)
+            realKey.onDown.add(keydownHandler, self);
+        if (keyupHandler != null)
+            realKey.onUp.add(keyupHandler, self);
+        // I don't think the output is going to be used.
+        return realKey;
     };
     SimpleGame.prototype.update = function () {
+        // First, update tank itself.
         this.tank.tankUpdate();
+        // Second, update the relationship between tank and sandbag.
+        this.tank.checkCollide(this.sandbag);
+        // Finally, fire if it should.
         if (this.game.input.activePointer.isDown) {
             this.tank.tankFire();
             return;
@@ -89,36 +122,28 @@ var SimpleGame = (function () {
     };
     return SimpleGame;
 }());
-window.onload = function () {
-    var game = new SimpleGame();
-};
-var Directions;
-(function (Directions) {
-    Directions[Directions["Up"] = 0] = "Up";
-    Directions[Directions["Down"] = 1] = "Down";
-    Directions[Directions["Left"] = 2] = "Left";
-    Directions[Directions["Right"] = 3] = "Right";
-    Directions[Directions["None"] = 4] = "None";
-})(Directions || (Directions = {}));
 var Tank = (function () {
     function Tank(game) {
         this.tankSpeed = 3;
+        this.direction = Directions.None;
         this.nextFire = 0;
         this.fireRate = 200;
         this.ownerGame = game;
         // Creat tank.
         this.tank = game.add.group(game, "tank", true, true, Phaser.Physics.ARCADE);
         this.tank.position.set(game.width / 2, game.height / 2);
-        // Seperate tank body and gun tower.
+        // Seperate tank body and gun tower.           
         this.tankbody = this.tank.create(0, 0, tankbodyName);
         this.guntower = this.tank.create(0, 0, guntowerName);
         this.tank.setAll("anchor", new Phaser.Point(0.5, 0.5));
+        // NOT Only enable the physics for tankbody.
+        // this.ownerGame.physics.arcade.enable(this.tankbody);
         this.tankbody.body.collideWorldBounds = true;
         this.tankbody.body.bounce.y = 1;
         this.tankbody.body.bounce.x = 1;
+        this.tankbody.body.mass = 70;
         // Create bullets.
         this.bullets = game.add.group();
-        // game.physics.enable(this.bullets, Phaser.Physics.ARCADE);
         this.bullets.enableBody = true;
         this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
         this.bullets.createMultiple(30, bulletName);
@@ -149,10 +174,14 @@ var Tank = (function () {
         this.direction = Directions.None;
     };
     Tank.prototype.tankUpdate = function () {
-        // First, move gun tower to point to pointer.
-        var angle = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, new Phaser.Point(this.tank.x, this.tank.y));
+        // First, move gun tower to point to mouse.
+        var angle = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
         this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
         // Second, move the tank.
+        if (this.direction === Directions.None) {
+            this.tankbody.body.velocity.x = 0;
+            this.tankbody.body.velocity.y = 0;
+        }
         switch (this.direction) {
             case Directions.None:
                 return;
@@ -170,15 +199,19 @@ var Tank = (function () {
                 return;
             default:
         }
+        // Finally, force to coordinate the guntower and tankbody.
+        // TODO: Find a smarter way to do this.
+        this.guntower.position = this.tankbody.position;
     };
     Tank.prototype.tankFire = function () {
         if (this.ownerGame.time.now < this.nextFire || this.bullets.countDead() <= 0) {
             return;
         }
+        // Set the cooldown time.
         this.nextFire = this.ownerGame.time.now + this.fireRate;
         // Get a random offset.
-        var randomAngleOffset = (Math.random() - 0.5) * 0.4;
-        var theta = this.guntower.angle / 360 * 6.283 + randomAngleOffset;
+        var randomAngleOffset = (Math.random() - 0.5) * 0;
+        var theta = Phaser.Math.degToRad(this.guntower.angle) + randomAngleOffset;
         // Bullet start position offset.
         var halfLength = this.guntower.height / 2;
         var xOffset = Math.sin(theta) * halfLength;
@@ -187,12 +220,27 @@ var Tank = (function () {
         var bullet = this.bullets.getFirstDead();
         bullet.anchor.set(0.5, 0.5);
         bullet.angle = this.guntower.angle;
-        bullet.reset(this.tank.x + xOffset, this.tank.y + yOffset);
+        // Get the position of the tank.
+        var guntowerPosition = this.tankbody.body.center;
+        bullet.reset(guntowerPosition.x + xOffset, guntowerPosition.y + yOffset);
         var longway = 10000;
         xOffset = Math.sin(theta) * longway;
         yOffset = -1 * Math.cos(theta) * longway;
-        this.ownerGame.physics.arcade.moveToXY(bullet, this.tank.x + xOffset, this.tank.y + yOffset, 1000);
+        this.ownerGame.physics.arcade.moveToXY(bullet, guntowerPosition.x + xOffset, guntowerPosition.y + yOffset, 1000);
+    };
+    Tank.prototype.checkCollide = function (another) {
+        var self = this;
+        this.ownerGame.physics.arcade.collide(this.tankbody, another);
+        this.bullets.forEachAlive(function (item) {
+            self.ownerGame.physics.arcade.collide(item, another, function (bullet, another) { return Tank.BulletHit(bullet, another, self.ownerGame); });
+        }, this);
+    };
+    Tank.BulletHit = function (bullet, another, game) {
+        bullet.kill();
+        // Now we are creating the particle emitter, centered to the world
+        var emitter = game.add.emitter((bullet.x + another.x) / 2, (bullet.y + another.y) / 2);
+        emitter.makeParticles(particleName, 0, 50, false, false);
+        emitter.explode(300, 50);
     };
     return Tank;
 }());
-//# sourceMappingURL=game.js.map
