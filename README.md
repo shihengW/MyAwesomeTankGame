@@ -3,6 +3,9 @@
 ## Overview:
 #### This is a game project to try out phaser.
 
+## How to plan:
+Just get a http-server from npm and you are good to go.
+
 ## Plan: 
 * [In-progress] 1. Collision, physics and move
 *   1.1. Sand bag
