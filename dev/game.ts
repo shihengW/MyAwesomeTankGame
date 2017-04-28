@@ -20,11 +20,14 @@ class SimpleGame {
     game: Phaser.Game;
     tank: Tank;
     sandbag: Phaser.Sprite;
+    // Find its real class;
+    socket: any;
 
     constructor() {
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
+        this.socket = io();
     }
 
     preload() {

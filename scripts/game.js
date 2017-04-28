@@ -25,6 +25,7 @@ var SimpleGame = (function () {
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
+        var socket = io();
     }
     SimpleGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
