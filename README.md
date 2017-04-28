@@ -1,4 +1,4 @@
-# PharserTryout
+# My awesome tank fight game
 
 ## Overview:
 #### This is a game project to try out phaser.
