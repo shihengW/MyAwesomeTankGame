@@ -47,4 +47,5 @@ Temporary Items
 .apdisk
 
 # Nodejs dependencies
-/server/node_modules/*
+/node_modules/*
+/debug
