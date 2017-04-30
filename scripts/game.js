@@ -1,17 +1,6 @@
-/// ****** names and parameters. ****** ///
-// Names
-var sandbagName = "sandbag";
-var tankbodyName = "tankbody";
-var guntowerName = "guntower";
-var bulletName = "bullet";
-var particleName = "particle";
-// Parameters
-var playerSpeed = 10;
-/// ********************************************************** ///
-/// *** Game main class *** ///
-window.onload = function () {
-    var game = new SimpleGame();
-};
+/// <reference path="../.ts_dependencies/pixi.d.ts" />
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
+/// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var Directions;
 (function (Directions) {
     Directions[Directions["Up"] = 0] = "Up";
@@ -25,7 +14,7 @@ var SimpleGame = (function () {
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
-        var socket = io();
+        this.socket = io();
     }
     SimpleGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
@@ -119,12 +108,27 @@ var SimpleGame = (function () {
     };
     return SimpleGame;
 }());
+/// *** Game main class *** ///
+window.onload = function () {
+    var game = new SimpleGame();
+};
+/// ****** names and parameters. ****** ///
+// Names
+var sandbagName = "sandbag";
+var tankbodyName = "tankbody";
+var guntowerName = "guntower";
+var bulletName = "bullet";
+var particleName = "particle";
+// Parameters  
+var playerSpeed = 10;
+/// ********************************************************** /// 
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
 // Don't touch anything else, just refactor this class first.
-var PhysicsManager = (function () {
-    function PhysicsManager() {
+var AdvancedPhysicsManager = (function () {
+    function AdvancedPhysicsManager() {
     }
     // Just suppose this is right, we will test it anyway.
-    PhysicsManager.addDirection = function (sprite, direction) {
+    AdvancedPhysicsManager.addDirection = function (sprite, direction) {
         var normalizedAngle = Phaser.Math.normalizeAngle(sprite.angle, false);
         switch (direction) {
             case Directions.Up:
@@ -185,9 +189,9 @@ var PhysicsManager = (function () {
                 break;
         }
     };
-    PhysicsManager.removeDirection = function (sprite, direction) {
+    AdvancedPhysicsManager.removeDirection = function (sprite, direction) {
     };
-    PhysicsManager.directionToAngle = function (direction) {
+    AdvancedPhysicsManager.directionToAngle = function (direction) {
         switch (direction) {
             case Directions.Up:
                 return 0;
@@ -201,21 +205,21 @@ var PhysicsManager = (function () {
                 return -1;
         }
     };
-    PhysicsManager.hasUpPortion = function (angle) {
+    AdvancedPhysicsManager.hasUpPortion = function (angle) {
         return angle < 90 || angle > 270;
     };
-    PhysicsManager.hasDownPortion = function (angle) {
+    AdvancedPhysicsManager.hasDownPortion = function (angle) {
         return angle > 90 && angle < 270;
     };
-    PhysicsManager.hasLeftPortion = function (angle) {
+    AdvancedPhysicsManager.hasLeftPortion = function (angle) {
         return angle > 180 && angle < 360;
     };
-    PhysicsManager.hasRightPortion = function (angle) {
+    AdvancedPhysicsManager.hasRightPortion = function (angle) {
         return angle > 0 && angle < 180;
     };
-    return PhysicsManager;
+    return AdvancedPhysicsManager;
 }());
-/// ********************************************************** ///
+/// ********************************************************** /// 
 /// *** tank class *** ///
 var Tank = (function () {
     function Tank(game) {
