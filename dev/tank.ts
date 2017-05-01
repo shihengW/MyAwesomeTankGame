@@ -8,13 +8,15 @@ class Tank {
     private ownerGame: Phaser.Game;
     private tankSpeed: number = 3;
     private direction: Directions = Directions.None;
+    id: number;
 
-    constructor(game: Phaser.Game) {
+    constructor(game: Phaser.Game, id: number, x:number, y:number) {
         this.ownerGame = game;
+        this.id = id;
 
         // Creat tank.
         this.tank = game.add.group(game, "tank", true, true, Phaser.Physics.ARCADE);
-        this.tank.position.set(game.width / 2, game.height / 2);
+        this.tank.position.set(x, y);
 
         // Seperate tank body and gun tower.           
         this.tankbody = this.tank.create(0, 0, tankbodyName);
@@ -64,6 +66,19 @@ class Tank {
         this.direction = Directions.None;
     }
 
+    tankUpdateAsPuppet(angle: number, position: Phaser.Point, firing: boolean) {
+        this.guntower.angle = angle;
+
+        this.tankbody.body.velocity.x = 0;
+        this.tankbody.body.velocity.y = 0;
+
+        this.tank.position = position;
+        
+        if (firing) {
+            Tank.prototype.tankFire();
+        }
+    }
+
     tankUpdate() {
         // First, move gun tower to point to mouse.
         const angle: number = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
@@ -90,7 +105,6 @@ class Tank {
     }
 
     private nextFire: number = 0;
-    private fireRate: number = 200;
 
     tankFire() {
         if (this.ownerGame.time.now < this.nextFire || this.bullets.countDead() <= 0) {
@@ -98,7 +112,7 @@ class Tank {
         }
 
         // Set the cooldown time.
-        this.nextFire = this.ownerGame.time.now + this.fireRate;
+        this.nextFire = this.ownerGame.time.now + fireRate;
 
         // Get a random offset.
         const randomAngleOffset: number = (Math.random() - 0.5) * 0;
@@ -129,7 +143,7 @@ class Tank {
     checkCollide(another: Phaser.Sprite) {
         let self = this;
 
-        this.ownerGame.physics.arcade.collide(this.tankbody, another);
+        // this.ownerGame.physics.arcade.collide(this.tankbody, another);
         this.bullets.forEachAlive((item:Phaser.Sprite) => {
             self.ownerGame.physics.arcade.collide(item, another, 
                 (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.BulletHit(bullet, another, self.ownerGame));
@@ -142,6 +156,20 @@ class Tank {
         let emitter = game.add.emitter((bullet.x + another.x) / 2, (bullet.y + another.y) / 2);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
+    }
+
+    getJson() {
+        return {
+            x: this.tank.position.x,
+            id: this.id,
+            y: this.tank.position.y,
+            angle: this.guntower.angle,
+            firing: false
+        }
+    }
+
+    setByJson(params: any) {
+        this.tankUpdateAsPuppet(params.angle, new Phaser.Point(params.x, params.y), false);
     }
 }
 /// ********************************************************** ///

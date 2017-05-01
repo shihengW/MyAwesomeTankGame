@@ -11,10 +11,10 @@ var Directions;
 })(Directions || (Directions = {}));
 var SimpleGame = (function () {
     function SimpleGame() {
+        this.id = Math.random() * 10000;
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
-        this.socket = io();
     }
     SimpleGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
@@ -26,14 +26,37 @@ var SimpleGame = (function () {
     };
     SimpleGame.prototype.create = function () {
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        this.tank = new Tank(this.game);
-        // Add enemy.
-        this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
         // Inputs.
         SimpleGame.registerKey(this, Phaser.Keyboard.W, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        // Add yourself.
+        // Create the tank, give it a random location an let the server know.
+        var x = Math.floor(this.game.width * Math.random());
+        var y = Math.floor(this.game.height * Math.random());
+        this.tank = new Tank(this.game, this.id, x, y);
+        // Create socket and tell the server
+        this.socket = io();
+        var self = this;
+        // First register everything I need.
+        this.socket.on("tankUpdateGlobal", function (player) {
+            var exist = false;
+            if (self.enemies == undefined) {
+                self.enemies = [new Tank(self.game, player.id, player.x, player.y)];
+            }
+            self.enemies.forEach(function (item) {
+                if (player.id == item.id) {
+                    item.setByJson(player);
+                    exist = true;
+                }
+            });
+            if (!exist) {
+                self.enemies.push(new Tank(self.game, player.id, player.x, player.y));
+            }
+        });
+        // Add a sandbag for testing.
+        // this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
     };
     SimpleGame.createSandbagAndMakeItMove = function (game) {
         var sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
@@ -60,15 +83,16 @@ var SimpleGame = (function () {
         return realKey;
     };
     SimpleGame.prototype.update = function () {
-        // First, update tank itself.
+        // First, update tank itself and let othters know.
         this.tank.tankUpdate();
-        // Second, update the relationship between tank and sandbag.
-        this.tank.checkCollide(this.sandbag);
-        // Finally, fire if it should.
+        this.socket.emit("tankUpdate", this.tank.getJson());
+        // Then, fire if it should.
         if (this.game.input.activePointer.isDown) {
             this.tank.tankFire();
             return;
         }
+        // Local update.
+        this.tank.checkCollide(this.sandbag);
     };
     SimpleGame.prototype.stopTank = function (e) {
         var shouldStop = false;
@@ -119,9 +143,12 @@ var tankbodyName = "tankbody";
 var guntowerName = "guntower";
 var bulletName = "bullet";
 var particleName = "particle";
+// Comm names
+// just a notify.
+var jointGameEventName = "tankUpdate";
 // Parameters  
 var playerSpeed = 10;
-/// ********************************************************** /// 
+var fireRate = 200;
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // Don't touch anything else, just refactor this class first.
 var AdvancedPhysicsManager = (function () {
@@ -222,15 +249,15 @@ var AdvancedPhysicsManager = (function () {
 /// ********************************************************** /// 
 /// *** tank class *** ///
 var Tank = (function () {
-    function Tank(game) {
+    function Tank(game, id, x, y) {
         this.tankSpeed = 3;
         this.direction = Directions.None;
         this.nextFire = 0;
-        this.fireRate = 200;
         this.ownerGame = game;
+        this.id = id;
         // Creat tank.
         this.tank = game.add.group(game, "tank", true, true, Phaser.Physics.ARCADE);
-        this.tank.position.set(game.width / 2, game.height / 2);
+        this.tank.position.set(x, y);
         // Seperate tank body and gun tower.           
         this.tankbody = this.tank.create(0, 0, tankbodyName);
         this.guntower = this.tank.create(0, 0, guntowerName);
@@ -272,6 +299,15 @@ var Tank = (function () {
     Tank.prototype.tankEndMove = function () {
         this.direction = Directions.None;
     };
+    Tank.prototype.tankUpdateAsPuppet = function (angle, position, firing) {
+        this.guntower.angle = angle;
+        this.tankbody.body.velocity.x = 0;
+        this.tankbody.body.velocity.y = 0;
+        this.tank.position = position;
+        if (firing) {
+            Tank.prototype.tankFire();
+        }
+    };
     Tank.prototype.tankUpdate = function () {
         // First, move gun tower to point to mouse.
         var angle = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
@@ -307,7 +343,7 @@ var Tank = (function () {
             return;
         }
         // Set the cooldown time.
-        this.nextFire = this.ownerGame.time.now + this.fireRate;
+        this.nextFire = this.ownerGame.time.now + fireRate;
         // Get a random offset.
         var randomAngleOffset = (Math.random() - 0.5) * 0;
         var theta = Phaser.Math.degToRad(this.guntower.angle) + randomAngleOffset;
@@ -329,7 +365,7 @@ var Tank = (function () {
     };
     Tank.prototype.checkCollide = function (another) {
         var self = this;
-        this.ownerGame.physics.arcade.collide(this.tankbody, another);
+        // this.ownerGame.physics.arcade.collide(this.tankbody, another);
         this.bullets.forEachAlive(function (item) {
             self.ownerGame.physics.arcade.collide(item, another, function (bullet, another) { return Tank.BulletHit(bullet, another, self.ownerGame); });
         }, this);
@@ -341,7 +377,18 @@ var Tank = (function () {
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
     };
+    Tank.prototype.getJson = function () {
+        return {
+            x: this.tank.position.x,
+            id: this.id,
+            y: this.tank.position.y,
+            angle: this.guntower.angle,
+            firing: false
+        };
+    };
+    Tank.prototype.setByJson = function (params) {
+        this.tankUpdateAsPuppet(params.angle, new Phaser.Point(params.x, params.y), false);
+    };
     return Tank;
 }());
 /// ********************************************************** /// 
-//# sourceMappingURL=game.js.map

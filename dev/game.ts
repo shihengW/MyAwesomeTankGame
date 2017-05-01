@@ -8,6 +8,9 @@ class SimpleGame {
     game: Phaser.Game;
     tank: Tank;
     sandbag: Phaser.Sprite;
+    enemies: Tank[];
+    id: number = Math.random() * 10000;
+
     // Find its real class;
     socket: any;
 
@@ -15,7 +18,6 @@ class SimpleGame {
         this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
-        this.socket = io();
     }
 
     preload() {
@@ -29,16 +31,43 @@ class SimpleGame {
 
     create() {
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        this.tank = new Tank(this.game);
-        
-        // Add enemy.
-        this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
-        
+
         // Inputs.
         SimpleGame.registerKey(this, Phaser.Keyboard.W, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);    
+    
+        // Add yourself.
+        // Create the tank, give it a random location an let the server know.
+        let x = Math.floor(this.game.width * Math.random());
+        let y = Math.floor(this.game.height * Math.random());
+        this.tank = new Tank(this.game, this.id, x, y);
+        
+        // Create socket and tell the server
+        this.socket = io();
+        let self = this;
+
+        // First register everything I need.
+        this.socket.on("tankUpdateGlobal", function(player:any) {
+               let exist: boolean = false;
+
+               if (self.enemies == undefined) {
+                   self.enemies = [new Tank(self.game, player.id, player.x, player.y)];
+               }
+
+               self.enemies.forEach(item => {
+                    if (player.id == item.id) {
+                        item.setByJson(player);
+                        exist = true;   
+                    } 
+               })
+               if (!exist) {
+                   self.enemies.push(new Tank(self.game, player.id, player.x, player.y));
+               }
+         });  
+        // Add a sandbag for testing.
+        // this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
     }
 
     static createSandbagAndMakeItMove(game: Phaser.Game) : Phaser.Sprite {
@@ -68,16 +97,18 @@ class SimpleGame {
     }
 
     update() {
-        // First, update tank itself.
+        // First, update tank itself and let othters know.
         this.tank.tankUpdate();
-        // Second, update the relationship between tank and sandbag.
-        this.tank.checkCollide(this.sandbag);
-
-        // Finally, fire if it should.
+        this.socket.emit("tankUpdate", this.tank.getJson());
+        
+        // Then, fire if it should.
         if (this.game.input.activePointer.isDown) {
             this.tank.tankFire();
             return;
         }
+
+        // Local update.
+        this.tank.checkCollide(this.sandbag);
     }
 
     stopTank(e: Phaser.Key) {

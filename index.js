@@ -12,8 +12,10 @@ app.get('/', function(req, res){
 
 app.use(express.static(__dirname));
 
-io.on('connection', function(socket){
-  console.log('Someone called.');
+io.on('connection', function(socket) {
+  socket.on("tankUpdate", function(client) {
+    socket.broadcast.emit("tankUpdateGlobal", client);
+  });
 });
 
 http.listen(3000, function(){
