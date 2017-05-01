@@ -15,7 +15,7 @@ class SimpleGame {
     socket: any;
 
     constructor() {
-        this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
+        this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
     }

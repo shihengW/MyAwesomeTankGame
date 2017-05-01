@@ -12,7 +12,7 @@ var Directions;
 var SimpleGame = (function () {
     function SimpleGame() {
         this.id = Math.random() * 10000;
-        this.game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', {
+        this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
     }
@@ -151,8 +151,8 @@ var particleName = "particle";
 // just a notify.
 var jointGameEventName = "tankUpdate";
 // Parameters  
-var playerSpeed = 10;
-var fireRate = 200;
+var playerSpeed = 100;
+var fireRate = 300;
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // Don't touch anything else, just refactor this class first.
 var AdvancedPhysicsManager = (function () {

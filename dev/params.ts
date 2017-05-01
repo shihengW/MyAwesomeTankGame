@@ -11,5 +11,5 @@ const particleName: string = "particle";
 const jointGameEventName: string = "tankUpdate"
 
 // Parameters  
-const playerSpeed: number = 10;
-const fireRate: number = 200;
+const playerSpeed: number = 100;
+const fireRate: number = 300;
