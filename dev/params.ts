@@ -13,3 +13,7 @@ const jointGameEventName: string = "tankUpdate"
 // Parameters  
 const playerSpeed: number = 100;
 const fireRate: number = 300;
+const bulletSpeed: number = 700;
+const accuracy: number = 0;
+const bloodTextOffset = 60;
+const damage = 20;

@@ -2,16 +2,13 @@
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 
-enum Directions { Up, Down, Left, Right, None }
-
 class SimpleGame {
     game: Phaser.Game;
     tank: Tank;
     sandbag: Phaser.Sprite;
     enemies: Tank[];
-    id: number = Math.random() * 10000;
-
-    // Find its real class;
+    id: number;
+    // TODO: Find its real class;
     socket: any;
 
     constructor() {
@@ -38,36 +35,48 @@ class SimpleGame {
         SimpleGame.registerKey(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);    
     
-        // Add yourself.
-        // Create the tank, give it a random location an let the server know.
+        // Add yourself, give it a Id and put it at random location.
         let x = Math.floor(this.game.width * Math.random());
         let y = Math.floor(this.game.height * Math.random());
+        this.id = Math.ceil(Math.random() * 1000);
         this.tank = new Tank(this.game, this.id, x, y);
         
         // Create socket and tell the server
         this.socket = io();
         let self = this;
-
-        // First register everything I need.
         this.socket.on("tankUpdateGlobal", function(player:any) {
-               let exist: boolean = false;
+               // TODO: At least you should merge the logic.
+               if (player.blood <= 0) {
+                   // TODO: Refactor these ugly logic.
+                   let foundTank: Tank;
+                   self.enemies.forEach(item => {
+                        if (player.tankId == item.id) {
+                            foundTank = item;
+                        }});
+                   foundTank.setByJson(player);
+                   let index = self.enemies.indexOf(foundTank);
+                   if (index > -1) {
+                        self.enemies.splice(index, 1);                    
+                   }
+                   return;
+               }
 
                if (self.enemies == undefined) {
-                   self.enemies = [new Tank(self.game, player.id, player.x, player.y)];
+                   self.enemies = [new Tank(self.game, player.tankId, player.x, player.y)];
                }
-
-               self.enemies.forEach(item => {
-                    if (player.id == item.id) {
-                        item.setByJson(player);
-                        exist = true;   
-                    } 
-               })
-               if (!exist) {
-                   self.enemies.push(new Tank(self.game, player.id, player.x, player.y));
+               else {
+                    let exist: boolean = false;
+                    self.enemies.forEach(item => {
+                        if (player.tankId == item.id) {
+                            item.setByJson(player);
+                            exist = true;
+                        } 
+                    });
+                    if (!exist) {
+                        self.enemies.push(new Tank(self.game, player.id, player.x, player.y));
+                    }
                }
          });  
-        // Add a sandbag for testing.
-        // this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
     }
 
     static createSandbagAndMakeItMove(game: Phaser.Game) : Phaser.Sprite {
@@ -112,6 +121,10 @@ class SimpleGame {
         // Finally, check collision.
         if (this.enemies != undefined) {
             this.enemies.forEach(enemy => this.tank.checkCollide(enemy));
+        }
+
+        if (this.tank.blood <= 0) {
+            // TODO: we should game over at here.
         }
     }
 

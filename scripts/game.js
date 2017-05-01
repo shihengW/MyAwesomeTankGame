@@ -1,6 +1,3 @@
-/// <reference path="../.ts_dependencies/pixi.d.ts" />
-/// <reference path="../.ts_dependencies/phaser.d.ts" />
-/// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var Directions;
 (function (Directions) {
     Directions[Directions["Up"] = 0] = "Up";
@@ -9,9 +6,11 @@ var Directions;
     Directions[Directions["Right"] = 3] = "Right";
     Directions[Directions["None"] = 4] = "None";
 })(Directions || (Directions = {}));
+/// <reference path="../.ts_dependencies/pixi.d.ts" />
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
+/// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var SimpleGame = (function () {
     function SimpleGame() {
-        this.id = Math.random() * 10000;
         this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
         });
@@ -31,32 +30,47 @@ var SimpleGame = (function () {
         SimpleGame.registerKey(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
         SimpleGame.registerKey(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        // Add yourself.
-        // Create the tank, give it a random location an let the server know.
+        // Add yourself, give it a Id and put it at random location.
         var x = Math.floor(this.game.width * Math.random());
         var y = Math.floor(this.game.height * Math.random());
+        this.id = Math.ceil(Math.random() * 1000);
         this.tank = new Tank(this.game, this.id, x, y);
         // Create socket and tell the server
         this.socket = io();
         var self = this;
-        // First register everything I need.
         this.socket.on("tankUpdateGlobal", function (player) {
-            var exist = false;
-            if (self.enemies == undefined) {
-                self.enemies = [new Tank(self.game, player.id, player.x, player.y)];
-            }
-            self.enemies.forEach(function (item) {
-                if (player.id == item.id) {
-                    item.setByJson(player);
-                    exist = true;
+            // TODO: At least you should merge the logic.
+            if (player.blood <= 0) {
+                // TODO: Refactor these ugly logic.
+                var foundTank_1;
+                self.enemies.forEach(function (item) {
+                    if (player.tankId == item.id) {
+                        foundTank_1 = item;
+                    }
+                });
+                foundTank_1.setByJson(player);
+                var index = self.enemies.indexOf(foundTank_1);
+                if (index > -1) {
+                    self.enemies.splice(index, 1);
                 }
-            });
-            if (!exist) {
-                self.enemies.push(new Tank(self.game, player.id, player.x, player.y));
+                return;
+            }
+            if (self.enemies == undefined) {
+                self.enemies = [new Tank(self.game, player.tankId, player.x, player.y)];
+            }
+            else {
+                var exist_1 = false;
+                self.enemies.forEach(function (item) {
+                    if (player.tankId == item.id) {
+                        item.setByJson(player);
+                        exist_1 = true;
+                    }
+                });
+                if (!exist_1) {
+                    self.enemies.push(new Tank(self.game, player.id, player.x, player.y));
+                }
             }
         });
-        // Add a sandbag for testing.
-        // this.sandbag = SimpleGame.createSandbagAndMakeItMove(this.game);
     };
     SimpleGame.createSandbagAndMakeItMove = function (game) {
         var sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
@@ -96,6 +110,9 @@ var SimpleGame = (function () {
         // Finally, check collision.
         if (this.enemies != undefined) {
             this.enemies.forEach(function (enemy) { return _this.tank.checkCollide(enemy); });
+        }
+        if (this.tank.blood <= 0) {
+            // TODO: we should game over at here.
         }
     };
     SimpleGame.prototype.stopTank = function (e) {
@@ -153,6 +170,10 @@ var jointGameEventName = "tankUpdate";
 // Parameters  
 var playerSpeed = 100;
 var fireRate = 300;
+var bulletSpeed = 700;
+var accuracy = 0;
+var bloodTextOffset = 60;
+var damage = 20;
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // Don't touch anything else, just refactor this class first.
 var AdvancedPhysicsManager = (function () {
@@ -260,11 +281,15 @@ var Tank = (function () {
         this.nextFire = 0;
         this.ownerGame = game;
         this.id = id;
+        this.blood = 100;
         // Seperate tank body and gun tower.           
         this.tankbody = game.add.sprite(x, y, tankbodyName);
         this.guntower = game.add.sprite(x, y, guntowerName);
+        var style = { font: "20px Arial", fill: "#00A000", align: "center" };
+        this.bloodText = game.add.text(x, y - bloodTextOffset, (this.blood), style);
         this.tankbody.anchor.set(0.5, 0.5);
         this.guntower.anchor.set(0.5, 0.5);
+        this.bloodText.anchor.set(0.5, 0.5);
         // Setup physics
         game.physics.arcade.enable(this.tankbody);
         this.tankbody.body.collideWorldBounds = true;
@@ -305,13 +330,20 @@ var Tank = (function () {
     Tank.prototype.tankEndMove = function () {
         this.direction = Directions.None;
     };
-    Tank.prototype.tankUpdateAsPuppet = function (gunAngle, tankAngle, position, firing) {
+    Tank.prototype.tankUpdateAsPuppet = function (gunAngle, tankAngle, position, firing, blood) {
         this.guntower.angle = gunAngle;
         this.tankbody.angle = tankAngle;
         this.tankbody.body.velocity.x = 0;
         this.tankbody.body.velocity.y = 0;
         this.tankbody.position = position;
         this.guntower.position = position;
+        this.bloodText.position = new Phaser.Point(position.x, position.y + bloodTextOffset);
+        this.blood = blood;
+        this.bloodText.text = blood;
+        if (this.blood <= 0) {
+            var self_1 = this;
+            Tank.tankExplode(self_1);
+        }
         if (firing) {
             this.tankFire(firing);
         }
@@ -342,9 +374,11 @@ var Tank = (function () {
                 break;
             default: break;
         }
-        // Finally, force to coordinate the guntower and tankbody.
+        // Finally, force to coordinate the guntower, tankbody and blood text
         // TODO: Find a smarter way to do this.
         this.guntower.position = this.tankbody.position;
+        this.bloodText.position = new Phaser.Point(this.tankbody.position.x, this.tankbody.position.y + bloodTextOffset);
+        this.bloodText.text = this.blood;
     };
     Tank.prototype.tankFire = function (forceFiring) {
         if (forceFiring === void 0) { forceFiring = false; }
@@ -355,7 +389,7 @@ var Tank = (function () {
         // Set the cooldown time.
         this.nextFire = this.ownerGame.time.now + fireRate;
         // Get a random offset.
-        var randomAngleOffset = (Math.random() - 0.5) * 0;
+        var randomAngleOffset = (Math.random() - 0.5) * accuracy;
         var theta = Phaser.Math.degToRad(this.guntower.angle) + randomAngleOffset;
         // Bullet start position offset.
         var halfLength = this.guntower.height / 2;
@@ -371,20 +405,35 @@ var Tank = (function () {
         var longway = 10000;
         xOffset = Math.sin(theta) * longway;
         yOffset = -1 * Math.cos(theta) * longway;
-        this.ownerGame.physics.arcade.moveToXY(bullet, guntowerPosition.x + xOffset, guntowerPosition.y + yOffset, 1000);
+        this.ownerGame.physics.arcade.moveToXY(bullet, guntowerPosition.x + xOffset, guntowerPosition.y + yOffset, bulletSpeed);
         return true;
     };
     Tank.prototype.checkCollide = function (another) {
+        var _this = this;
         var self = this;
         // this.ownerGame.physics.arcade.collide(this.tankbody, another);
         this.bullets.forEachAlive(function (item) {
-            self.ownerGame.physics.arcade.collide(item, another.tankbody, function (bullet, another) { return Tank.BulletHit(bullet, another, self.ownerGame); });
+            self.ownerGame.physics.arcade.collide(item, another.tankbody, function (bullet, another) { return Tank.bulletHit(bullet, another, self.ownerGame); });
         }, this);
         another.bullets.forEachAlive(function (item) {
-            self.ownerGame.physics.arcade.collide(item, self.tankbody, function (bullet, another) { return Tank.BulletHit(bullet, another, self.ownerGame); });
+            self.ownerGame.physics.arcade.collide(item, self.tankbody, function (bullet, another) {
+                Tank.bulletHit(bullet, another, self.ownerGame);
+                _this.blood -= damage;
+                if (_this.blood <= 0) {
+                    Tank.tankExplode(self);
+                }
+            });
         }, this);
     };
-    Tank.BulletHit = function (bullet, another, game) {
+    Tank.tankExplode = function (self) {
+        var emitter = self.ownerGame.add.emitter(self.tankbody.position.x, self.tankbody.position.y);
+        emitter.makeParticles(particleName, 0, 50, false, false);
+        emitter.explode(500, 50);
+        self.tankbody.kill();
+        self.guntower.kill();
+        // self.bloodText.kill();
+    };
+    Tank.bulletHit = function (bullet, another, game) {
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
         var emitter = game.add.emitter((bullet.x + another.body.x) / 2, (bullet.y + another.body.y) / 2);
@@ -393,16 +442,17 @@ var Tank = (function () {
     };
     Tank.prototype.getJson = function (firing) {
         return {
-            id: this.id,
+            tankId: this.id,
             x: this.tankbody.position.x,
             y: this.tankbody.position.y,
             gunAngle: this.guntower.angle,
             tankAngle: this.tankbody.angle,
-            firing: firing
+            firing: firing,
+            blood: this.blood
         };
     };
     Tank.prototype.setByJson = function (params) {
-        this.tankUpdateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing);
+        this.tankUpdateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
     };
     return Tank;
 }());

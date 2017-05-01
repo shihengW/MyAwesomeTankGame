@@ -2,10 +2,8 @@
 
 // Don't touch anything else, just refactor this class first.
 class AdvancedPhysicsManager {
-
     // Just suppose this is right, we will test it anyway.
     static addDirection(sprite: Phaser.Sprite, direction: Directions) {
-
         let normalizedAngle = Phaser.Math.normalizeAngle(sprite.angle, false);
 
         switch (direction) {
