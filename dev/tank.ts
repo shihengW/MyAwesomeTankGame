@@ -1,6 +1,6 @@
+// TODO: Should use group when figure out how
 /// *** tank class *** ///
 class Tank {
-    private tank: Phaser.Group;
     private guntower: Phaser.Sprite;
     private tankbody: Phaser.Sprite;
 
@@ -12,23 +12,21 @@ class Tank {
 
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
         this.ownerGame = game;
-        this.id = id;
-
-        // Creat tank.
-        this.tank = game.add.group(game, "tank", true, true, Phaser.Physics.ARCADE);
-        this.tank.position.set(x, y);
+        this.id = id; 
 
         // Seperate tank body and gun tower.           
-        this.tankbody = this.tank.create(0, 0, tankbodyName);
-        this.guntower = this.tank.create(0, 0, guntowerName);
-        this.tank.setAll("anchor", new Phaser.Point(0.5, 0.5));
+        this.tankbody = game.add.sprite(x, y, tankbodyName);
+        this.guntower = game.add.sprite(x, y, guntowerName);
 
-        // NOT Only enable the physics for tankbody.
-        // this.ownerGame.physics.arcade.enable(this.tankbody);
+        this.tankbody.anchor.set(0.5, 0.5);
+        this.guntower.anchor.set(0.5, 0.5);
+    
+        // Setup physics
+        game.physics.arcade.enable(this.tankbody);
         this.tankbody.body.collideWorldBounds = true;
         this.tankbody.body.bounce.y = 1;
         this.tankbody.body.bounce.x = 1;
-        this.tankbody.body.mass = 70;
+        this.tankbody.body.mass = 100000;
         
         // Create bullets.
         this.bullets = game.add.group();
@@ -38,6 +36,9 @@ class Tank {
 
         this.bullets.setAll("checkWorldBounds", true);
         this.bullets.setAll("outOfBoundsKill", true);
+        this.bullets.forEachAlive((item:Phaser.Sprite) => {
+            item.body.mass = 0.1;
+        }, this);
     }
 
     tankStartMove(d: Directions) {
@@ -73,10 +74,11 @@ class Tank {
         this.tankbody.body.velocity.x = 0;
         this.tankbody.body.velocity.y = 0;
 
-        this.tank.position = position;
+        this.tankbody.position = position;
+        this.guntower.position = position;
         
         if (firing) {
-            Tank.prototype.tankFire();
+            this.tankFire(firing);
         }
     }
 
@@ -93,10 +95,10 @@ class Tank {
         }
         switch (this.direction) {
             case Directions.None: break;
-            case Directions.Up: this.tank.position.add(0, -1 * this.tankSpeed); break;
-            case Directions.Down: this.tank.position.add(0, this.tankSpeed); break;
-            case Directions.Left: this.tank.position.add(-1 * this.tankSpeed, 0); break;
-            case Directions.Right: this.tank.position.add(this.tankSpeed, 0); break;
+            case Directions.Up: this.tankbody.position.add(0, -1 * this.tankSpeed); break;
+            case Directions.Down: this.tankbody.position.add(0, this.tankSpeed); break;
+            case Directions.Left: this.tankbody.position.add(-1 * this.tankSpeed, 0); break;
+            case Directions.Right: this.tankbody.position.add(this.tankSpeed, 0); break;
             default: break;
         }
 
@@ -151,12 +153,17 @@ class Tank {
             self.ownerGame.physics.arcade.collide(item, another.tankbody, 
                 (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.BulletHit(bullet, another, self.ownerGame));
         }, this);
+
+        another.bullets.forEachAlive((item:Phaser.Sprite) => {
+            self.ownerGame.physics.arcade.collide(item, self.tankbody, 
+                (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.BulletHit(bullet, another, self.ownerGame));
+        }, this);
     }
 
     static BulletHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
-        let emitter = game.add.emitter((bullet.x + another.x) / 2, (bullet.y + another.y) / 2);
+        let emitter = game.add.emitter((bullet.x + another.body.x) / 2, (bullet.y + another.body.y) / 2);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
     }
@@ -164,8 +171,8 @@ class Tank {
     getJson(firing: boolean) : any {
         return {
             id: this.id,
-            x: this.tank.position.x,
-            y: this.tank.position.y,
+            x: this.tankbody.position.x,
+            y: this.tankbody.position.y,
             gunAngle: this.guntower.angle,
             tankAngle: this.tankbody.angle,
             firing: firing
