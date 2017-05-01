@@ -83,16 +83,20 @@ var SimpleGame = (function () {
         return realKey;
     };
     SimpleGame.prototype.update = function () {
-        // First, update tank itself and let othters know.
+        var _this = this;
+        // First, update tank itself.
         this.tank.tankUpdate();
-        this.socket.emit("tankUpdate", this.tank.getJson());
         // Then, fire if it should.
+        var firing = false;
         if (this.game.input.activePointer.isDown) {
-            this.tank.tankFire();
-            return;
+            firing = this.tank.tankFire();
         }
-        // Local update.
-        this.tank.checkCollide(this.sandbag);
+        // Third, let others know your decision.
+        this.socket.emit("tankUpdate", this.tank.getJson(firing));
+        // Finally, check collision.
+        if (this.enemies != undefined) {
+            this.enemies.forEach(function (enemy) { return _this.tank.checkCollide(enemy); });
+        }
     };
     SimpleGame.prototype.stopTank = function (e) {
         var shouldStop = false;
@@ -299,8 +303,9 @@ var Tank = (function () {
     Tank.prototype.tankEndMove = function () {
         this.direction = Directions.None;
     };
-    Tank.prototype.tankUpdateAsPuppet = function (angle, position, firing) {
-        this.guntower.angle = angle;
+    Tank.prototype.tankUpdateAsPuppet = function (gunAngle, tankAngle, position, firing) {
+        this.guntower.angle = gunAngle;
+        this.tankbody.angle = tankAngle;
         this.tankbody.body.velocity.x = 0;
         this.tankbody.body.velocity.y = 0;
         this.tank.position = position;
@@ -338,9 +343,11 @@ var Tank = (function () {
         // TODO: Find a smarter way to do this.
         this.guntower.position = this.tankbody.position;
     };
-    Tank.prototype.tankFire = function () {
-        if (this.ownerGame.time.now < this.nextFire || this.bullets.countDead() <= 0) {
-            return;
+    Tank.prototype.tankFire = function (forceFiring) {
+        if (forceFiring === void 0) { forceFiring = false; }
+        if (!forceFiring
+            && (this.ownerGame.time.now < this.nextFire || this.bullets.countDead() <= 0)) {
+            return false;
         }
         // Set the cooldown time.
         this.nextFire = this.ownerGame.time.now + fireRate;
@@ -362,12 +369,13 @@ var Tank = (function () {
         xOffset = Math.sin(theta) * longway;
         yOffset = -1 * Math.cos(theta) * longway;
         this.ownerGame.physics.arcade.moveToXY(bullet, guntowerPosition.x + xOffset, guntowerPosition.y + yOffset, 1000);
+        return true;
     };
     Tank.prototype.checkCollide = function (another) {
         var self = this;
         // this.ownerGame.physics.arcade.collide(this.tankbody, another);
         this.bullets.forEachAlive(function (item) {
-            self.ownerGame.physics.arcade.collide(item, another, function (bullet, another) { return Tank.BulletHit(bullet, another, self.ownerGame); });
+            self.ownerGame.physics.arcade.collide(item, another.tankbody, function (bullet, another) { return Tank.BulletHit(bullet, another, self.ownerGame); });
         }, this);
     };
     Tank.BulletHit = function (bullet, another, game) {
@@ -377,17 +385,18 @@ var Tank = (function () {
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
     };
-    Tank.prototype.getJson = function () {
+    Tank.prototype.getJson = function (firing) {
         return {
-            x: this.tank.position.x,
             id: this.id,
+            x: this.tank.position.x,
             y: this.tank.position.y,
-            angle: this.guntower.angle,
-            firing: false
+            gunAngle: this.guntower.angle,
+            tankAngle: this.tankbody.angle,
+            firing: firing
         };
     };
     Tank.prototype.setByJson = function (params) {
-        this.tankUpdateAsPuppet(params.angle, new Phaser.Point(params.x, params.y), false);
+        this.tankUpdateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing);
     };
     return Tank;
 }());

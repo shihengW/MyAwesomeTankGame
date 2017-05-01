@@ -97,18 +97,22 @@ class SimpleGame {
     }
 
     update() {
-        // First, update tank itself and let othters know.
+        // First, update tank itself.
         this.tank.tankUpdate();
-        this.socket.emit("tankUpdate", this.tank.getJson());
         
         // Then, fire if it should.
+        let firing = false;
         if (this.game.input.activePointer.isDown) {
-            this.tank.tankFire();
-            return;
+            firing = this.tank.tankFire();
         }
 
-        // Local update.
-        this.tank.checkCollide(this.sandbag);
+        // Third, let others know your decision.
+        this.socket.emit("tankUpdate", this.tank.getJson(firing));
+
+        // Finally, check collision.
+        if (this.enemies != undefined) {
+            this.enemies.forEach(enemy => this.tank.checkCollide(enemy));
+        }
     }
 
     stopTank(e: Phaser.Key) {

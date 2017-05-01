@@ -66,8 +66,9 @@ class Tank {
         this.direction = Directions.None;
     }
 
-    tankUpdateAsPuppet(angle: number, position: Phaser.Point, firing: boolean) {
-        this.guntower.angle = angle;
+    tankUpdateAsPuppet(gunAngle: number, tankAngle: number, position: Phaser.Point, firing: boolean) {
+        this.guntower.angle = gunAngle;
+        this.tankbody.angle = tankAngle;
 
         this.tankbody.body.velocity.x = 0;
         this.tankbody.body.velocity.y = 0;
@@ -106,9 +107,10 @@ class Tank {
 
     private nextFire: number = 0;
 
-    tankFire() {
-        if (this.ownerGame.time.now < this.nextFire || this.bullets.countDead() <= 0) {
-            return;
+    tankFire(forceFiring: boolean = false) : boolean {
+        if (!forceFiring 
+        && (this.ownerGame.time.now < this.nextFire || this.bullets.countDead() <= 0)) {
+            return false;
         }
 
         // Set the cooldown time.
@@ -138,14 +140,15 @@ class Tank {
         yOffset = -1 * Math.cos(theta) * longway;
         this.ownerGame.physics.arcade.moveToXY(bullet, 
             guntowerPosition.x + xOffset, guntowerPosition.y + yOffset, 1000);
+        return true;
     }
 
-    checkCollide(another: Phaser.Sprite) {
+    checkCollide(another: Tank) {
         let self = this;
 
         // this.ownerGame.physics.arcade.collide(this.tankbody, another);
         this.bullets.forEachAlive((item:Phaser.Sprite) => {
-            self.ownerGame.physics.arcade.collide(item, another, 
+            self.ownerGame.physics.arcade.collide(item, another.tankbody, 
                 (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.BulletHit(bullet, another, self.ownerGame));
         }, this);
     }
@@ -158,18 +161,19 @@ class Tank {
         emitter.explode(300, 50);
     }
 
-    getJson() {
+    getJson(firing: boolean) : any {
         return {
-            x: this.tank.position.x,
             id: this.id,
+            x: this.tank.position.x,
             y: this.tank.position.y,
-            angle: this.guntower.angle,
-            firing: false
+            gunAngle: this.guntower.angle,
+            tankAngle: this.tankbody.angle,
+            firing: firing
         }
     }
 
     setByJson(params: any) {
-        this.tankUpdateAsPuppet(params.angle, new Phaser.Point(params.x, params.y), false);
+        this.tankUpdateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing);
     }
 }
 /// ********************************************************** ///
