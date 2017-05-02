@@ -83,69 +83,58 @@ class SimpleGame {
 
     update() {
         // First, update tank itself.
-        this.player.tankUpdate();
-        
-        // Then, fire if it should.
-        let firing = false;
-        if (this.game.input.activePointer.isDown) {
-            firing = this.player.tankFire();
-        }
+        let message = this.player.update(this.game.input.activePointer.isDown);
+        this.socket.emit(tankUpdateEventName, message);
 
-        if (firing || this.game.time.now > this.nextUpdate) {
-            this.nextUpdate = this.game.time.now + 100;
-            // Third, let others know your decision.
-            this.socket.emit(tankUpdateEventName, this.player.getJson(firing));
-        }
-
-        // Finally, check collision.
+        // Then, check collision.
         if (this.enemies != undefined) {
             this.enemies.forEach(enemy => this.player.checkCombatResult(enemy));
         }
     }
 
-    stopTank(e: Phaser.Key) {
+    private stopTank(e: Phaser.Key) {
         let shouldStop = false;
 
         switch (e.event.key) {
             case "w":
-                shouldStop = this.player.getDirection() === Directions.Up; break;
+                shouldStop = this.player.direction === Directions.Up; break;
             case "a":
-                shouldStop = this.player.getDirection() === Directions.Left; break;
+                shouldStop = this.player.direction === Directions.Left; break;
             case "s":
-                shouldStop = this.player.getDirection() === Directions.Down; break;
+                shouldStop = this.player.direction === Directions.Down; break;
             case "d":
-                shouldStop = this.player.getDirection() === Directions.Right; break;
+                shouldStop = this.player.direction === Directions.Right; break;
         }
 
         if (shouldStop) {
-            this.player.tankEndMove();
+            this.player.setDirection(Directions.None);
         }
     }
     
-    moveTank(e: Phaser.Key) {
+    private moveTank(e: Phaser.Key) {
         switch (e.event.key) {
             case "w":
-                this.player.tankStartMove(Directions.Up);
+                this.player.setDirection(Directions.Up);
                 return;
             case "a":
-                this.player.tankStartMove(Directions.Left);
+                this.player.setDirection(Directions.Left);
                 return;
             case "s":
-                this.player.tankStartMove(Directions.Down);
+                this.player.setDirection(Directions.Down);
                 return;
             case "d":
-                this.player.tankStartMove(Directions.Right);
+                this.player.setDirection(Directions.Right);
                 return;
         }
     }
 
-    static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
+    private static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
         let realKey = self.game.input.keyboard.addKey(key);
         if (keydownHandler != null) realKey.onDown.add(keydownHandler, self);
         if (keyupHandler != null) realKey.onUp.add(keyupHandler, self);
     }
 
-    static createSandbagAndMakeItMove(game: Phaser.Game) : Phaser.Sprite {
+    private static createSandbagAndMakeItMove(game: Phaser.Game) : Phaser.Sprite {
         let sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
 
         // Setup
