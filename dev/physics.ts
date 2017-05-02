@@ -1,6 +1,5 @@
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
-
-// Don't touch anything else, just refactor this class first.
+// TODO: Finish these logic when you have time.
 class AdvancedPhysicsManager {
     // Just suppose this is right, we will test it anyway.
     static addDirection(sprite: Phaser.Sprite, direction: Directions) {
