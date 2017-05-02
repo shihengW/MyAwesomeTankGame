@@ -8,7 +8,8 @@ const particleName: string = "particle";
 
 // Comm names
 // just a notify.
-const tankUpdateEventName: string = "tankUpdate"
+const tankUpdateEventName: string = "tankUpdate";
+const tankUpdateGlobalEventName: string = "tankUpdateGlobal";
 
 // Parameters  
 const playerSpeed: number = 100;

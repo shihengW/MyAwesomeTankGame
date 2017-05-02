@@ -9,11 +9,11 @@ class Tank {
     // Others.
     private ownerGame: Phaser.Game;
     private direction: Directions = Directions.None;
+    private blood: number;
 
     // Publics.
     id: number;
-    blood: number;
-
+    
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
         this.ownerGame = game;
         this.id = id;
@@ -246,9 +246,9 @@ class Tank {
         let emitter = self.ownerGame.add.emitter(self.tankbody.position.x, self.tankbody.position.y);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(500, 50);
-        self.tankbody.kill();
-        self.guntower.kill();
-        // self.bloodText.kill();
+        self.tankbody.destroy();
+        self.guntower.destroy();
+        self.bloodText.destroy();
     }
 
     private static bulletHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {

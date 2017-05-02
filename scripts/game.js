@@ -11,11 +11,15 @@ var Directions;
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var SimpleGame = (function () {
     function SimpleGame() {
+        this.nextUpdate = 0;
         this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
-            create: this.create, preload: this.preload, update: this.update
+            create: this.create, preload: this.preload, update: this.update, pause: this.pause
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
     }
+    SimpleGame.prototype.pause = function () {
+        this.socket.emit("pause", {});
+    };
     SimpleGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
         this.game.load.image(bulletName, "../resources/bullet.png");
@@ -40,7 +44,7 @@ var SimpleGame = (function () {
         // Create socket, register events and tell the server
         this.socket = io();
         var self = this;
-        this.socket.on("tankUpdateGlobal", function (player) {
+        this.socket.on(tankUpdateGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
             // TODO: At least you should merge the logic.
             if (player.blood <= 0) {
@@ -85,8 +89,11 @@ var SimpleGame = (function () {
         if (this.game.input.activePointer.isDown) {
             firing = this.player.tankFire();
         }
-        // Third, let others know your decision.
-        this.socket.emit("tankUpdate", this.player.getJson(firing));
+        if (firing || this.game.time.now > this.nextUpdate) {
+            this.nextUpdate = this.game.time.now + 100;
+            // Third, let others know your decision.
+            this.socket.emit(tankUpdateEventName, this.player.getJson(firing));
+        }
         // Finally, check collision.
         if (this.enemies != undefined) {
             this.enemies.forEach(function (enemy) { return _this.player.checkCombatResult(enemy); });
@@ -168,6 +175,7 @@ var particleName = "particle";
 // Comm names
 // just a notify.
 var tankUpdateEventName = "tankUpdate";
+var tankUpdateGlobalEventName = "tankUpdateGlobal";
 // Parameters  
 var playerSpeed = 100;
 var fireRate = 300;

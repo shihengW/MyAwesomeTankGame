@@ -42,7 +42,7 @@ class SimpleGame {
         // Create socket, register events and tell the server
         this.socket = io();
         let self = this;
-        this.socket.on("tankUpdateGlobal", function(player: IUpdatemessage) {
+        this.socket.on(tankUpdateGlobalEventName, function(player: IUpdatemessage) {
                // If player has no blood, remove it from the list.
                // TODO: At least you should merge the logic.
                if (player.blood <= 0) {
@@ -79,6 +79,8 @@ class SimpleGame {
          });  
     }
 
+    private nextUpdate: number = 0;
+
     update() {
         // First, update tank itself.
         this.player.tankUpdate();
@@ -89,16 +91,15 @@ class SimpleGame {
             firing = this.player.tankFire();
         }
 
-        // Third, let others know your decision.
-        this.socket.emit("tankUpdate", this.player.getJson(firing));
+        if (firing || this.game.time.now > this.nextUpdate) {
+            this.nextUpdate = this.game.time.now + 100;
+            // Third, let others know your decision.
+            this.socket.emit(tankUpdateEventName, this.player.getJson(firing));
+        }
 
         // Finally, check collision.
         if (this.enemies != undefined) {
             this.enemies.forEach(enemy => this.player.checkCombatResult(enemy));
-        }
-
-        if (this.player.blood <= 0) {
-            // TODO: we should game over at here.
         }
     }
 

@@ -13,8 +13,17 @@ app.get('/', function(req, res){
 app.use(express.static(__dirname));
 
 io.on('connection', function(socket) {
+  var id;
+
+  // When anything updated.
   socket.on("tankUpdate", function(client) {
+    id = client.tankId;
     socket.broadcast.emit("tankUpdateGlobal", client);
+  });
+
+  // When client disconnected.
+  socket.on('disconnect', function () {
+    socket.broadcast.emit("disconnectGlobal", { tankId: id });
   });
 });
 
