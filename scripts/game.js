@@ -13,13 +13,10 @@ var SimpleGame = (function () {
     function SimpleGame() {
         this.nextUpdate = 0;
         this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
-            create: this.create, preload: this.preload, update: this.update, pause: this.pause
+            create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
     }
-    SimpleGame.prototype.pause = function () {
-        this.socket.emit("pause", {});
-    };
     SimpleGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
         this.game.load.image(bulletName, "../resources/bullet.png");
@@ -83,58 +80,46 @@ var SimpleGame = (function () {
     SimpleGame.prototype.update = function () {
         var _this = this;
         // First, update tank itself.
-        this.player.tankUpdate();
-        // Then, fire if it should.
-        var firing = false;
-        if (this.game.input.activePointer.isDown) {
-            firing = this.player.tankFire();
-        }
-        if (firing || this.game.time.now > this.nextUpdate) {
-            this.nextUpdate = this.game.time.now + 100;
-            // Third, let others know your decision.
-            this.socket.emit(tankUpdateEventName, this.player.getJson(firing));
-        }
-        // Finally, check collision.
+        var message = this.player.update(this.game.input.activePointer.isDown);
+        this.socket.emit(tankUpdateEventName, message);
+        // Then, check collision.
         if (this.enemies != undefined) {
             this.enemies.forEach(function (enemy) { return _this.player.checkCombatResult(enemy); });
-        }
-        if (this.player.blood <= 0) {
-            // TODO: we should game over at here.
         }
     };
     SimpleGame.prototype.stopTank = function (e) {
         var shouldStop = false;
         switch (e.event.key) {
             case "w":
-                shouldStop = this.player.getDirection() === Directions.Up;
+                shouldStop = this.player.direction === Directions.Up;
                 break;
             case "a":
-                shouldStop = this.player.getDirection() === Directions.Left;
+                shouldStop = this.player.direction === Directions.Left;
                 break;
             case "s":
-                shouldStop = this.player.getDirection() === Directions.Down;
+                shouldStop = this.player.direction === Directions.Down;
                 break;
             case "d":
-                shouldStop = this.player.getDirection() === Directions.Right;
+                shouldStop = this.player.direction === Directions.Right;
                 break;
         }
         if (shouldStop) {
-            this.player.tankEndMove();
+            this.player.setDirection(Directions.None);
         }
     };
     SimpleGame.prototype.moveTank = function (e) {
         switch (e.event.key) {
             case "w":
-                this.player.tankStartMove(Directions.Up);
+                this.player.setDirection(Directions.Up);
                 return;
             case "a":
-                this.player.tankStartMove(Directions.Left);
+                this.player.setDirection(Directions.Left);
                 return;
             case "s":
-                this.player.tankStartMove(Directions.Down);
+                this.player.setDirection(Directions.Down);
                 return;
             case "d":
-                this.player.tankStartMove(Directions.Right);
+                this.player.setDirection(Directions.Right);
                 return;
         }
     };
@@ -285,6 +270,7 @@ var AdvancedPhysicsManager = (function () {
 // TODO: Should use group when figure out how
 var Tank = (function () {
     function Tank(game, id, x, y) {
+        this.gameOver = false;
         this.direction = Directions.None;
         // #endregion Move system
         // #region: Fire system
@@ -317,19 +303,50 @@ var Tank = (function () {
             item.body.mass = 0.1;
         }, this);
     }
-    Tank.prototype.getDirection = function () {
-        return this.direction;
+    Tank.prototype.update = function (shouldFire) {
+        // If game over, do nothing.
+        if (this.gameOver) {
+            return this.getJson(false);
+        }
+        if (this.blood <= 0) {
+            this.gameOver = true;
+            Tank.tankExplode(this);
+            return this.getJson(false);
+        }
+        var fire = false;
+        this.setPosition();
+        if (shouldFire) {
+            fire = this.fire();
+        }
+        return this.getJson(fire);
     };
-    Tank.prototype.tankUpdate = function () {
+    // #regions Move system
+    Tank.prototype.setDirection = function (d) {
+        if (this.gameOver) {
+            return;
+        }
+        this.direction = d;
+        switch (d) {
+            case Directions.Up:
+                this.tankbody.angle = 0;
+                return;
+            case Directions.Left:
+                this.tankbody.angle = -90;
+                return;
+            case Directions.Down:
+                this.tankbody.angle = 180;
+                return;
+            case Directions.Right:
+                this.tankbody.angle = 90;
+                return;
+        }
+    };
+    Tank.prototype.setPosition = function () {
         // First, move gun tower to point to mouse.
         var angle = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
         this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
         // Second, move the tank.
-        // TODO: Find a better way to move the tank.
-        if (this.direction === Directions.None) {
-            this.tankbody.body.velocity.x = 0;
-            this.tankbody.body.velocity.y = 0;
-        }
+        this.tankbody.body.velocity.set(0, 0);
         switch (this.direction) {
             case Directions.None: break;
             case Directions.Up:
@@ -347,31 +364,9 @@ var Tank = (function () {
             default: break;
         }
         // Finally, force to coordinate the guntower, tankbody and blood text
-        // TODO: Find a smarter way to do this.
         this.guntower.position = this.tankbody.position;
         this.bloodText.position = new Phaser.Point(this.tankbody.position.x, this.tankbody.position.y + bloodTextOffset);
         this.bloodText.text = this.blood;
-    };
-    // #regions Move system
-    Tank.prototype.tankStartMove = function (d) {
-        this.direction = d;
-        switch (d) {
-            case Directions.Up:
-                this.tankbody.angle = 0;
-                return;
-            case Directions.Left:
-                this.tankbody.angle = -90;
-                return;
-            case Directions.Down:
-                this.tankbody.angle = 180;
-                return;
-            case Directions.Right:
-                this.tankbody.angle = 90;
-                return;
-        }
-    };
-    Tank.prototype.tankEndMove = function () {
-        this.direction = Directions.None;
     };
     Tank.prototype.shouldFire = function (forceFiring) {
         if (forceFiring === void 0) { forceFiring = false; }
@@ -401,7 +396,7 @@ var Tank = (function () {
         return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
             startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
     };
-    Tank.prototype.tankFireCore = function (startX, startY, moveToX, moveToY) {
+    Tank.prototype.fireCore = function (startX, startY, moveToX, moveToY) {
         // Get bullet.
         var bullet = this.bullets.getFirstDead();
         bullet.angle = this.guntower.angle;
@@ -410,7 +405,7 @@ var Tank = (function () {
         // bullet.body.angularVelocity = 5000;
         this.ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, bulletSpeed);
     };
-    Tank.prototype.tankFire = function (forceFiring) {
+    Tank.prototype.fire = function (forceFiring) {
         if (forceFiring === void 0) { forceFiring = false; }
         if (!this.shouldFire(forceFiring)) {
             return false;
@@ -418,7 +413,7 @@ var Tank = (function () {
         // Calculate the trajectory.
         var trajectory = this.calculateTrajectory();
         // Fire.
-        this.tankFireCore(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
+        this.fireCore(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
         // Just move the guntower a little bit to simulate the Newton's second law.
         var Newton = true;
         if (Newton) {
@@ -431,6 +426,18 @@ var Tank = (function () {
     // #endregion: Fire system
     // #region: Comms
     Tank.prototype.getJson = function (firing) {
+        // If already died, just return an useless message.
+        if (this.gameOver) {
+            return {
+                tankId: this.id,
+                x: -1,
+                y: -1,
+                gunAngle: 0,
+                tankAngle: 0,
+                firing: false,
+                blood: 0
+            };
+        }
         return {
             tankId: this.id,
             x: this.tankbody.position.x,
@@ -445,6 +452,16 @@ var Tank = (function () {
         this.tankUpdateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
     };
     Tank.prototype.tankUpdateAsPuppet = function (gunAngle, tankAngle, position, firing, blood) {
+        // if already gameover, do nothing.
+        if (this.gameOver) {
+            return;
+        }
+        // if blood is less or equal to 0, set gameover tag, then explode.
+        if (this.blood <= 0) {
+            this.gameOver = true;
+            Tank.tankExplode(this);
+            return;
+        }
         this.guntower.angle = gunAngle;
         this.tankbody.angle = tankAngle;
         this.tankbody.body.velocity.x = 0;
@@ -459,7 +476,7 @@ var Tank = (function () {
             Tank.tankExplode(self_1);
         }
         if (firing) {
-            this.tankFire(firing);
+            this.fire(firing);
         }
     };
     // #endregion: Comms
@@ -475,19 +492,18 @@ var Tank = (function () {
             self.ownerGame.physics.arcade.collide(item, self.tankbody, function (bullet, another) {
                 Tank.bulletHit(bullet, another, self.ownerGame);
                 _this.blood -= damage;
-                if (_this.blood <= 0) {
-                    Tank.tankExplode(self);
-                }
             });
         }, this);
     };
     Tank.tankExplode = function (self) {
+        // Emit and destroy everything.
         var emitter = self.ownerGame.add.emitter(self.tankbody.position.x, self.tankbody.position.y);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(500, 50);
-        self.tankbody.kill();
-        self.guntower.kill();
-        // self.bloodText.kill();
+        self.tankbody.destroy();
+        self.guntower.destroy();
+        self.bloodText.destroy();
+        self.bullets.destroy();
     };
     Tank.bulletHit = function (bullet, another, game) {
         bullet.kill();

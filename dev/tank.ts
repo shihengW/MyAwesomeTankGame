@@ -8,11 +8,12 @@ class Tank {
 
     // Others.
     private ownerGame: Phaser.Game;
-    private direction: Directions = Directions.None;
     private blood: number;
+    private gameOver: boolean = false;
 
     // Publics.
     id: number;
+    direction: Directions = Directions.None;
     
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
         this.ownerGame = game;
@@ -48,40 +49,34 @@ class Tank {
             item.body.mass = 0.1; }, this);
     }
 
-    getDirection() : Directions {
-        return this.direction;
-    }
-
-    tankUpdate() {
-        // First, move gun tower to point to mouse.
-        const angle: number = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
-        this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
-
-        // Second, move the tank.
-        // TODO: Find a better way to move the tank.
-        if (this.direction === Directions.None) {
-            this.tankbody.body.velocity.x = 0;
-            this.tankbody.body.velocity.y = 0;
-        }
-        switch (this.direction) {
-            case Directions.None: break;
-            case Directions.Up: this.tankbody.position.add(0, -1 * tankSpeed); break;
-            case Directions.Down: this.tankbody.position.add(0, tankSpeed); break;
-            case Directions.Left: this.tankbody.position.add(-1 * tankSpeed, 0); break;
-            case Directions.Right: this.tankbody.position.add(tankSpeed, 0); break;
-            default: break;
+    update(shouldFire): IUpdatemessage {
+        // If game over, do nothing.
+        if (this.gameOver) {
+            return this.getJson(false);
         }
 
-        // Finally, force to coordinate the guntower, tankbody and blood text
-        // TODO: Find a smarter way to do this.
-        this.guntower.position = this.tankbody.position;
-        this.bloodText.position = new Phaser.Point(this.tankbody.position.x, 
-            this.tankbody.position.y + bloodTextOffset);
-        this.bloodText.text = <string><any>this.blood;
+        if (this.blood <= 0) {
+            this.gameOver = true;
+            Tank.tankExplode(this);
+            return this.getJson(false);
+        }
+
+        let fire: boolean = false;
+        this.setPosition();
+        
+        if (shouldFire) {
+            fire = this.fire();
+        }
+
+        return this.getJson(fire);
     }
 
 // #regions Move system
-    tankStartMove(d: Directions) {
+    setDirection(d: Directions) {
+        if (this.gameOver) {
+            return;
+        }
+
         this.direction = d;
         switch (d) {
             case Directions.Up:
@@ -99,10 +94,27 @@ class Tank {
         }
     }
 
-    tankEndMove() {
-        this.direction = Directions.None;
-    }
+    private setPosition() {
+        // First, move gun tower to point to mouse.
+        const angle: number = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
+        this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
 
+        // Second, move the tank.
+        this.tankbody.body.velocity.set(0, 0);
+        switch (this.direction) {
+            case Directions.None: break;
+            case Directions.Up: this.tankbody.position.add(0, -1 * tankSpeed); break;
+            case Directions.Down: this.tankbody.position.add(0, tankSpeed); break;
+            case Directions.Left: this.tankbody.position.add(-1 * tankSpeed, 0); break;
+            case Directions.Right: this.tankbody.position.add(tankSpeed, 0); break;
+            default: break;
+        }
+
+        // Finally, force to coordinate the guntower, tankbody and blood text
+        this.guntower.position = this.tankbody.position;
+        this.bloodText.position = new Phaser.Point(this.tankbody.position.x, this.tankbody.position.y + bloodTextOffset);
+        this.bloodText.text = <string><any>this.blood;
+    }
 // #endregion Move system
 
 // #region: Fire system
@@ -141,7 +153,7 @@ class Tank {
             startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
     }
 
-    private tankFireCore(startX: number, startY: number, moveToX: number, moveToY: number) {
+    private fireCore(startX: number, startY: number, moveToX: number, moveToY: number) {
         // Get bullet.
         const bullet: Phaser.Sprite = this.bullets.getFirstDead();
         bullet.angle = this.guntower.angle;
@@ -151,7 +163,7 @@ class Tank {
         this.ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, bulletSpeed);
     }
 
-    tankFire(forceFiring: boolean = false) : boolean {
+    private fire(forceFiring: boolean = false) : boolean {
         if (!this.shouldFire(forceFiring)) {
             return false;
         }
@@ -160,7 +172,7 @@ class Tank {
         let trajectory: ITrajectory = this.calculateTrajectory();
         
         // Fire.
-        this.tankFireCore(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
+        this.fireCore(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
         
         // Just move the guntower a little bit to simulate the Newton's second law.
         let Newton = true;
@@ -177,7 +189,20 @@ class Tank {
 
 // #region: Comms
 
-    getJson(firing: boolean) : IUpdatemessage {
+    private getJson(firing: boolean) : IUpdatemessage {
+        // If already died, just return an useless message.
+        if (this.gameOver) {
+            return {
+                tankId: this.id,
+                x: -1,
+                y: -1,
+                gunAngle: 0,
+                tankAngle: 0,
+                firing: false,
+                blood: 0
+            };
+        }
+
         return {
             tankId: this.id,
             x: this.tankbody.position.x,
@@ -195,6 +220,18 @@ class Tank {
 
     private tankUpdateAsPuppet(gunAngle: number, tankAngle: number, 
         position: Phaser.Point, firing: boolean, blood: number) {
+        // if already gameover, do nothing.
+        if (this.gameOver) {
+            return;
+        }
+
+        // if blood is less or equal to 0, set gameover tag, then explode.
+        if (this.blood <= 0) {
+            this.gameOver = true;
+            Tank.tankExplode(this);
+            return;
+        }
+
         this.guntower.angle = gunAngle;
         this.tankbody.angle = tankAngle;
         
@@ -213,7 +250,7 @@ class Tank {
         }
 
         if (firing) {
-            this.tankFire(firing);
+            this.fire(firing);
         }
     }
 
@@ -234,21 +271,21 @@ class Tank {
             self.ownerGame.physics.arcade.collide(item, self.tankbody, 
                 (bullet: Phaser.Sprite, another: Phaser.Sprite) => {
                     Tank.bulletHit(bullet, another, self.ownerGame);
-                    this.blood -= damage;
-                    if (this.blood <= 0) {
-                        Tank.tankExplode(self);
-                    }    
+                    this.blood -= damage;   
                 });
         }, this);
     }    
 
     private static tankExplode(self: Tank) {
+        // Emit and destroy everything.
         let emitter = self.ownerGame.add.emitter(self.tankbody.position.x, self.tankbody.position.y);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(500, 50);
+        
         self.tankbody.destroy();
         self.guntower.destroy();
         self.bloodText.destroy();
+        self.bullets.destroy();
     }
 
     private static bulletHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {
