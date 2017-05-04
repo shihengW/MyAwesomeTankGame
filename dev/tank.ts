@@ -76,8 +76,8 @@ class Tank {
             return;
         }
         this.direction = d;
-        let newAngle = InputManager.directionToAngle(d);
-        let newSpeed = InputManager.directionToSpeed(d);
+        let newAngle = MovementHelper.directionToAngle(d);
+        let newSpeed = MovementHelper.directionToSpeed(d);
 
         if (newAngle != undefined) {
             this.tankbody.angle = newAngle;
