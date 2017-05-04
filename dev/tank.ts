@@ -33,8 +33,7 @@ class Tank {
         // Setup physics
         game.physics.arcade.enable(this.tankbody);
         this.tankbody.body.collideWorldBounds = true;
-        this.tankbody.body.bounce.y = 1;
-        this.tankbody.body.bounce.x = 1;
+        this.tankbody.body.bounce.set(0.1, 0.1);
         this.tankbody.body.mass = 100000;
         
         // Create bullets.
@@ -76,22 +75,16 @@ class Tank {
         if (this.gameOver) {
             return;
         }
-
         this.direction = d;
-        switch (d) {
-            case Directions.Up:
-                this.tankbody.angle = 0;
-                return;
-            case Directions.Left:
-                this.tankbody.angle = -90;
-                return;
-            case Directions.Down:
-                this.tankbody.angle = 180;
-                return;
-            case Directions.Right:
-                this.tankbody.angle = 90;
-                return;
+        let newAngle = InputManager.directionToAngle(d);
+        let newSpeed = InputManager.directionToSpeed(d);
+
+        if (newAngle != undefined) {
+            this.tankbody.angle = newAngle;
         }
+        
+        this.tankbody.body.velocity.x = newSpeed.x;
+        this.tankbody.body.velocity.y = newSpeed.y;
     }
 
     private setPosition() {
@@ -100,15 +93,15 @@ class Tank {
         this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
 
         // Second, move the tank.
-        this.tankbody.body.velocity.set(0, 0);
-        switch (this.direction) {
-            case Directions.None: break;
-            case Directions.Up: this.tankbody.position.add(0, -1 * tankSpeed); break;
-            case Directions.Down: this.tankbody.position.add(0, tankSpeed); break;
-            case Directions.Left: this.tankbody.position.add(-1 * tankSpeed, 0); break;
-            case Directions.Right: this.tankbody.position.add(tankSpeed, 0); break;
-            default: break;
-        }
+        // this.tankbody.body.velocity.set(0, 0);
+        // switch (this.direction) {
+        //     case Directions.None: break;
+        //     case Directions.Up: this.tankbody.position.add(0, -1 * tankSpeed); break;
+        //     case Directions.Down: this.tankbody.position.add(0, tankSpeed); break;
+        //     case Directions.Left: this.tankbody.position.add(-1 * tankSpeed, 0); break;
+        //     case Directions.Right: this.tankbody.position.add(tankSpeed, 0); break;
+        //     default: break;
+        // }
 
         // Finally, force to coordinate the guntower, tankbody and blood text
         this.guntower.position = this.tankbody.position;

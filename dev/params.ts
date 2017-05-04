@@ -18,4 +18,4 @@ const bulletSpeed: number = 700;
 const accuracy: number = 0;
 const bloodTextOffset = 60;
 const damage = 20;
-const tankSpeed: number = 3;
+const tankSpeed: number = 300;

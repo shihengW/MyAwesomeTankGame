@@ -1,10 +1,89 @@
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
+// TODO: Finish these logic when you have time.
+var AdvancedInputManager = (function () {
+    function AdvancedInputManager() {
+    }
+    AdvancedInputManager.addDirectionIntegral = function (tank, addDirection) {
+        var newDirection = AdvancedInputManager.addDirection(tank.direction, addDirection);
+        tank.setDirection(newDirection);
+    };
+    AdvancedInputManager.removeDirectionIntegral = function (tank, removeDirection) {
+        var newDirection = AdvancedInputManager.removeDirection(tank.direction, removeDirection);
+        tank.setDirection(newDirection);
+    };
+    AdvancedInputManager.addDirection = function (direction, addDirection) {
+        // If direction alread has the added direction, just return. This case may barely happen.
+        if ((direction & addDirection) != 0) {
+            return Directions.None;
+        }
+        var opsiteDirection = AdvancedInputManager.getOpsiteDirection(addDirection);
+        if ((direction & opsiteDirection) != 0) {
+            return direction = direction & (~opsiteDirection);
+        }
+        return direction | addDirection;
+    };
+    AdvancedInputManager.removeDirection = function (direction, removeDirection) {
+        return direction & (~removeDirection);
+    };
+    AdvancedInputManager.getOpsiteDirection = function (direction) {
+        switch (direction) {
+            case Directions.Up: return Directions.Down;
+            case Directions.Down: return Directions.Up;
+            case Directions.Left: return Directions.Right;
+            case Directions.Right: return Directions.Left;
+        }
+        return Directions.None;
+    };
+    AdvancedInputManager.directionToAngle = function (direction) {
+        switch (direction) {
+            case Directions.Up:
+                return 0;
+            case Directions.Down:
+                return 180;
+            case Directions.Left:
+                return -90;
+            case Directions.Right:
+                return 90;
+            case Directions.UpLeft:
+                return -45;
+            case Directions.DownLeft:
+                return 225;
+            case Directions.UpRight:
+                return 45;
+            case Directions.DownRight:
+                return 135;
+            default:
+                return undefined;
+        }
+    };
+    AdvancedInputManager.directionToSpeed = function (direction) {
+        if (direction == Directions.None) {
+            return { x: 0, y: 0 };
+        }
+        var angle = AdvancedInputManager.directionToAngle(direction);
+        return AdvancedInputManager.angleToSpeed(angle);
+    };
+    AdvancedInputManager.angleToSpeed = function (angle) {
+        if (angle == undefined) {
+            return { x: 0, y: 0 };
+        }
+        var angleRad = Phaser.Math.degToRad(angle);
+        return { x: Math.sin(angleRad) * tankSpeed, y: 0 - Math.cos(angleRad) * tankSpeed };
+    };
+    return AdvancedInputManager;
+}());
+/// ********************************************************** /// 
 var Directions;
 (function (Directions) {
-    Directions[Directions["Up"] = 0] = "Up";
-    Directions[Directions["Down"] = 1] = "Down";
-    Directions[Directions["Left"] = 2] = "Left";
-    Directions[Directions["Right"] = 3] = "Right";
-    Directions[Directions["None"] = 4] = "None";
+    Directions[Directions["None"] = 0] = "None";
+    Directions[Directions["Up"] = 2] = "Up";
+    Directions[Directions["Down"] = 4] = "Down";
+    Directions[Directions["Left"] = 8] = "Left";
+    Directions[Directions["Right"] = 16] = "Right";
+    Directions[Directions["UpLeft"] = 10] = "UpLeft";
+    Directions[Directions["UpRight"] = 18] = "UpRight";
+    Directions[Directions["DownLeft"] = 12] = "DownLeft";
+    Directions[Directions["DownRight"] = 20] = "DownRight";
 })(Directions || (Directions = {}));
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
@@ -29,10 +108,10 @@ var SimpleGame = (function () {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         // Set-up inputs.
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.W, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.W, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.A, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.S, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.D, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
         // Add player, give it an id and put it at random location.
         var x = Math.floor(this.game.width * Math.random());
         var y = Math.floor(this.game.height * Math.random());
@@ -41,6 +120,7 @@ var SimpleGame = (function () {
         // Create socket, register events and tell the server
         this.socket = io();
         var self = this;
+        // TODO: Refactor. I hate these code.
         this.socket.on(tankUpdateGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
             // TODO: At least you should merge the logic.
@@ -87,41 +167,31 @@ var SimpleGame = (function () {
             this.enemies.forEach(function (enemy) { return _this.player.checkCombatResult(enemy); });
         }
     };
-    SimpleGame.prototype.stopTank = function (e) {
-        var shouldStop = false;
-        switch (e.event.key) {
-            case "w":
-                shouldStop = this.player.direction === Directions.Up;
-                break;
-            case "a":
-                shouldStop = this.player.direction === Directions.Left;
-                break;
-            case "s":
-                shouldStop = this.player.direction === Directions.Down;
-                break;
-            case "d":
-                shouldStop = this.player.direction === Directions.Right;
-                break;
-        }
-        if (shouldStop) {
-            this.player.setDirection(Directions.None);
-        }
+    SimpleGame.prototype.onKeyDown = function (e) {
+        var addDirection = SimpleGame.mapKeyToDirection(e.event.key);
+        AdvancedInputManager.addDirectionIntegral(this.player, addDirection);
     };
-    SimpleGame.prototype.moveTank = function (e) {
-        switch (e.event.key) {
+    SimpleGame.prototype.onKeyUp = function (e) {
+        var removeDirection = SimpleGame.mapKeyToDirection(e.event.key);
+        AdvancedInputManager.removeDirectionIntegral(this.player, removeDirection);
+    };
+    SimpleGame.mapKeyToDirection = function (key) {
+        var direction = Directions.None;
+        switch (key) {
             case "w":
-                this.player.setDirection(Directions.Up);
-                return;
+                direction = Directions.Up;
+                break;
             case "a":
-                this.player.setDirection(Directions.Left);
-                return;
+                direction = Directions.Left;
+                break;
             case "s":
-                this.player.setDirection(Directions.Down);
-                return;
+                direction = Directions.Down;
+                break;
             case "d":
-                this.player.setDirection(Directions.Right);
-                return;
+                direction = Directions.Right;
+                break;
         }
+        return direction;
     };
     SimpleGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
         var realKey = self.game.input.keyboard.addKey(key);
@@ -168,105 +238,7 @@ var bulletSpeed = 700;
 var accuracy = 0;
 var bloodTextOffset = 60;
 var damage = 20;
-var tankSpeed = 3;
-/// <reference path="../.ts_dependencies/phaser.d.ts" />
-// TODO: Finish these logic when you have time.
-var AdvancedPhysicsManager = (function () {
-    function AdvancedPhysicsManager() {
-    }
-    // Just suppose this is right, we will test it anyway.
-    AdvancedPhysicsManager.addDirection = function (sprite, direction) {
-        var normalizedAngle = Phaser.Math.normalizeAngle(sprite.angle, false);
-        switch (direction) {
-            case Directions.Up:
-                if (this.hasUpPortion(normalizedAngle)) {
-                    return;
-                }
-                if (this.hasDownPortion(normalizedAngle)) {
-                    sprite.angle = sprite.angle + 180;
-                    sprite.body.velocity.y = -1 * sprite.body.velocity.y;
-                }
-                else {
-                    sprite.angle = sprite.angle + (this.hasLeftPortion(normalizedAngle) ? 45 : -1 * 45);
-                    sprite.body.velocity.y = -1 * playerSpeed;
-                }
-                break;
-            case Directions.Down:
-                if (this.hasDownPortion(normalizedAngle)) {
-                    return;
-                }
-                if (this.hasUpPortion(normalizedAngle)) {
-                    sprite.angle = sprite.angle + 180;
-                    sprite.body.velocity.y = -1 * sprite.body.velocity.y;
-                }
-                else {
-                    sprite.angle = sprite.angle + (this.hasLeftPortion(normalizedAngle) ? -1 * 45 : 45);
-                    sprite.body.velocity.y = playerSpeed;
-                }
-                break;
-            case Directions.Left:
-                if (this.hasLeftPortion(normalizedAngle)) {
-                    return;
-                }
-                if (this.hasRightPortion(normalizedAngle)) {
-                    sprite.angle = sprite.angle + 180;
-                    sprite.body.velocity.x = -1 * sprite.body.velocity.x;
-                }
-                else {
-                    sprite.angle = sprite.angle + (this.hasUpPortion(normalizedAngle) ? -1 * 45 : 45);
-                    sprite.body.velocity.x = playerSpeed;
-                }
-                break;
-            case Directions.Right:
-                if (this.hasRightPortion(normalizedAngle)) {
-                    return;
-                }
-                if (this.hasLeftPortion(normalizedAngle)) {
-                    sprite.angle = sprite.angle + 180;
-                    sprite.body.velocity.x = -1 * sprite.body.velocity.x;
-                }
-                else {
-                    sprite.angle = sprite.angle + (this.hasUpPortion(normalizedAngle) ? 45 : -1 * 45);
-                    sprite.body.velocity.x = playerSpeed;
-                }
-                break;
-            case Directions.None:
-                break;
-            default:
-                break;
-        }
-    };
-    AdvancedPhysicsManager.removeDirection = function (sprite, direction) {
-    };
-    AdvancedPhysicsManager.directionToAngle = function (direction) {
-        switch (direction) {
-            case Directions.Up:
-                return 0;
-            case Directions.Down:
-                return 180;
-            case Directions.Left:
-                return -90;
-            case Directions.Right:
-                return 90;
-            default:
-                return -1;
-        }
-    };
-    AdvancedPhysicsManager.hasUpPortion = function (angle) {
-        return angle < 90 || angle > 270;
-    };
-    AdvancedPhysicsManager.hasDownPortion = function (angle) {
-        return angle > 90 && angle < 270;
-    };
-    AdvancedPhysicsManager.hasLeftPortion = function (angle) {
-        return angle > 180 && angle < 360;
-    };
-    AdvancedPhysicsManager.hasRightPortion = function (angle) {
-        return angle > 0 && angle < 180;
-    };
-    return AdvancedPhysicsManager;
-}());
-/// ********************************************************** /// 
+var tankSpeed = 300;
 // TODO: Should use group when figure out how
 var Tank = (function () {
     function Tank(game, id, x, y) {
@@ -289,8 +261,7 @@ var Tank = (function () {
         // Setup physics
         game.physics.arcade.enable(this.tankbody);
         this.tankbody.body.collideWorldBounds = true;
-        this.tankbody.body.bounce.y = 1;
-        this.tankbody.body.bounce.x = 1;
+        this.tankbody.body.bounce.set(0.1, 0.1);
         this.tankbody.body.mass = 100000;
         // Create bullets.
         this.bullets = game.add.group();
@@ -326,43 +297,28 @@ var Tank = (function () {
             return;
         }
         this.direction = d;
-        switch (d) {
-            case Directions.Up:
-                this.tankbody.angle = 0;
-                return;
-            case Directions.Left:
-                this.tankbody.angle = -90;
-                return;
-            case Directions.Down:
-                this.tankbody.angle = 180;
-                return;
-            case Directions.Right:
-                this.tankbody.angle = 90;
-                return;
+        var newAngle = AdvancedInputManager.directionToAngle(d);
+        var newSpeed = AdvancedInputManager.directionToSpeed(d);
+        if (newAngle != undefined) {
+            this.tankbody.angle = newAngle;
         }
+        this.tankbody.body.velocity.x = newSpeed.x;
+        this.tankbody.body.velocity.y = newSpeed.y;
     };
     Tank.prototype.setPosition = function () {
         // First, move gun tower to point to mouse.
         var angle = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
         this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
         // Second, move the tank.
-        this.tankbody.body.velocity.set(0, 0);
-        switch (this.direction) {
-            case Directions.None: break;
-            case Directions.Up:
-                this.tankbody.position.add(0, -1 * tankSpeed);
-                break;
-            case Directions.Down:
-                this.tankbody.position.add(0, tankSpeed);
-                break;
-            case Directions.Left:
-                this.tankbody.position.add(-1 * tankSpeed, 0);
-                break;
-            case Directions.Right:
-                this.tankbody.position.add(tankSpeed, 0);
-                break;
-            default: break;
-        }
+        // this.tankbody.body.velocity.set(0, 0);
+        // switch (this.direction) {
+        //     case Directions.None: break;
+        //     case Directions.Up: this.tankbody.position.add(0, -1 * tankSpeed); break;
+        //     case Directions.Down: this.tankbody.position.add(0, tankSpeed); break;
+        //     case Directions.Left: this.tankbody.position.add(-1 * tankSpeed, 0); break;
+        //     case Directions.Right: this.tankbody.position.add(tankSpeed, 0); break;
+        //     default: break;
+        // }
         // Finally, force to coordinate the guntower, tankbody and blood text
         this.guntower.position = this.tankbody.position;
         this.bloodText.position = new Phaser.Point(this.tankbody.position.x, this.tankbody.position.y + bloodTextOffset);

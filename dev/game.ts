@@ -28,10 +28,10 @@ class SimpleGame {
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
 
         // Set-up inputs.
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.W, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.A, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.S, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.D, SimpleGame.prototype.moveTank, SimpleGame.prototype.stopTank);    
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.W, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.A, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.S, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.D, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);    
     
         // Add player, give it an id and put it at random location.
         let x = Math.floor(this.game.width * Math.random());
@@ -42,6 +42,7 @@ class SimpleGame {
         // Create socket, register events and tell the server
         this.socket = io();
         let self = this;
+        // TODO: Refactor. I hate these code.
         this.socket.on(tankUpdateGlobalEventName, function(player: IUpdatemessage) {
                // If player has no blood, remove it from the list.
                // TODO: At least you should merge the logic.
@@ -92,40 +93,25 @@ class SimpleGame {
         }
     }
 
-    private stopTank(e: Phaser.Key) {
-        let shouldStop = false;
+    private onKeyDown(e: Phaser.Key) {
+        let addDirection = SimpleGame.mapKeyToDirection(e.event.key);
+        AdvancedInputManager.addDirectionIntegral(this.player, addDirection);
+    }
 
-        switch (e.event.key) {
-            case "w":
-                shouldStop = this.player.direction === Directions.Up; break;
-            case "a":
-                shouldStop = this.player.direction === Directions.Left; break;
-            case "s":
-                shouldStop = this.player.direction === Directions.Down; break;
-            case "d":
-                shouldStop = this.player.direction === Directions.Right; break;
-        }
-
-        if (shouldStop) {
-            this.player.setDirection(Directions.None);
-        }
+    private onKeyUp(e: Phaser.Key) {
+        let removeDirection = SimpleGame.mapKeyToDirection(e.event.key);
+        AdvancedInputManager.removeDirectionIntegral(this.player, removeDirection);
     }
     
-    private moveTank(e: Phaser.Key) {
-        switch (e.event.key) {
-            case "w":
-                this.player.setDirection(Directions.Up);
-                return;
-            case "a":
-                this.player.setDirection(Directions.Left);
-                return;
-            case "s":
-                this.player.setDirection(Directions.Down);
-                return;
-            case "d":
-                this.player.setDirection(Directions.Right);
-                return;
+    private static mapKeyToDirection(key: any) : Directions {
+        let direction: Directions = Directions.None;
+        switch (key) {
+            case "w": direction = Directions.Up; break;
+            case "a": direction = Directions.Left; break;
+            case "s": direction = Directions.Down; break;
+            case "d": direction = Directions.Right; break;
         }
+        return direction;
     }
 
     private static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
