@@ -1,13 +1,13 @@
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // TODO: Finish these logic when you have time.
-class InputManager {
+class MovementHelper {
     static addDirectionIntegral(tank: Tank, addDirection: Directions) {
-        let newDirection: Directions = InputManager.addDirection(tank.direction, addDirection);
+        let newDirection: Directions = MovementHelper.addDirection(tank.direction, addDirection);
         tank.setDirection(newDirection);
     }
 
     static removeDirectionIntegral(tank: Tank, removeDirection: Directions) {
-        let newDirection: Directions = InputManager.removeDirection(tank.direction, removeDirection);
+        let newDirection: Directions = MovementHelper.removeDirection(tank.direction, removeDirection);
         tank.setDirection(newDirection);
     }
 
@@ -17,7 +17,7 @@ class InputManager {
             return Directions.None;
         }
 
-        let opsiteDirection = InputManager.getOpsiteDirection(addDirection);
+        let opsiteDirection = MovementHelper.getOpsiteDirection(addDirection);
         if ((direction & opsiteDirection) != 0) {
             return direction = direction & (~opsiteDirection);
         }
@@ -67,8 +67,8 @@ class InputManager {
             return { x: 0, y: 0 };
         }
 
-        let angle: number = InputManager.directionToAngle(direction);
-        return InputManager.angleToSpeed(angle);
+        let angle: number = MovementHelper.directionToAngle(direction);
+        return MovementHelper.angleToSpeed(angle);
     }
 
     static angleToSpeed(angle: number) : {x: number, y: number} {

@@ -28,12 +28,11 @@ class SimpleGame {
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
 
         // Set-up inputs.
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.W, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.A, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.S, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.D, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);    
-    
-        // Add player, give it an id and put it at random location.
+        for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D ]) {
+            SimpleGame.registerKeyInputs(this, key, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        }
+
+        // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
         let x = Math.floor(this.game.width * Math.random());
         let y = Math.floor(this.game.height * Math.random());
         let id = Math.ceil(Math.random() * 1000);
