@@ -13,15 +13,15 @@ var Directions;
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
-var SimpleGame = (function () {
-    function SimpleGame() {
+var TheGame = (function () {
+    function TheGame() {
         this.nextUpdate = 0;
         this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
     }
-    SimpleGame.prototype.preload = function () {
+    TheGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
         this.game.load.image(bulletName, "../resources/bullet.png");
         this.game.load.image(particleName, "../resources/particle.png");
@@ -29,13 +29,13 @@ var SimpleGame = (function () {
         this.game.load.image(guntowerName, "../resources/guntower.png");
         this.game.stage.disableVisibilityChange = true;
     };
-    SimpleGame.prototype.create = function () {
+    TheGame.prototype.create = function () {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         // Set-up inputs.
         for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D]; _i < _a.length; _i++) {
             var key = _a[_i];
-            SimpleGame.registerKeyInputs(this, key, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+            TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
         }
         // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
         var x = Math.floor(this.game.width * Math.random());
@@ -54,7 +54,7 @@ var SimpleGame = (function () {
             }
         });
     };
-    SimpleGame.prototype.update = function () {
+    TheGame.prototype.update = function () {
         var _this = this;
         // First, update tank itself.
         var message = this._player.update(this.game.input.activePointer.isDown);
@@ -64,15 +64,15 @@ var SimpleGame = (function () {
             this._enemies.forEach(function (enemy) { return _this._player.combat(enemy); });
         }
     };
-    SimpleGame.prototype.onKeyDown = function (e) {
-        var addDirection = SimpleGame.mapKeyToDirection(e.event.key);
+    TheGame.prototype.onKeyDown = function (e) {
+        var addDirection = TheGame.mapKeyToDirection(e.event.key);
         MovementHelper.addDirectionIntegral(this._player, addDirection);
     };
-    SimpleGame.prototype.onKeyUp = function (e) {
-        var removeDirection = SimpleGame.mapKeyToDirection(e.event.key);
+    TheGame.prototype.onKeyUp = function (e) {
+        var removeDirection = TheGame.mapKeyToDirection(e.event.key);
         MovementHelper.removeDirectionIntegral(this._player, removeDirection);
     };
-    SimpleGame.prototype.removeEnemyByJson = function (enemy) {
+    TheGame.prototype.removeEnemyByJson = function (enemy) {
         // TODO: Refactor these ugly logic.
         var foundTank = undefined;
         this._enemies.forEach(function (item) {
@@ -86,7 +86,7 @@ var SimpleGame = (function () {
         }
         return foundTank;
     };
-    SimpleGame.prototype.updateEnemyByJson = function (enemy) {
+    TheGame.prototype.updateEnemyByJson = function (enemy) {
         if (this._enemies == undefined) {
             this._enemies = [new Tank(this.game, enemy.tankId, enemy.x, enemy.y)];
         }
@@ -104,14 +104,14 @@ var SimpleGame = (function () {
         }
     };
     // #region: statics.
-    SimpleGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
+    TheGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
         var realKey = self.game.input.keyboard.addKey(key);
         if (keydownHandler != null)
             realKey.onDown.add(keydownHandler, self);
         if (keyupHandler != null)
             realKey.onUp.add(keyupHandler, self);
     };
-    SimpleGame.mapKeyToDirection = function (key) {
+    TheGame.mapKeyToDirection = function (key) {
         var direction = Directions.None;
         switch (key) {
             case "w":
@@ -129,7 +129,7 @@ var SimpleGame = (function () {
         }
         return direction;
     };
-    SimpleGame.createSandbagAndMakeItMove = function (game) {
+    TheGame.createSandbagAndMakeItMove = function (game) {
         var sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
         // Setup
         game.physics.arcade.enable(sandbag);
@@ -143,11 +143,11 @@ var SimpleGame = (function () {
         game.physics.arcade.accelerateToXY(sandbag, game.width / 2, game.height / 2 - 50, 100);
         return sandbag;
     };
-    return SimpleGame;
+    return TheGame;
 }());
 /// *** Game main class *** ///
 window.onload = function () {
-    var game = new SimpleGame();
+    var game = new TheGame();
 };
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // TODO: Finish these logic when you have time.

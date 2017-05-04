@@ -1,7 +1,7 @@
 ﻿/// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
-class SimpleGame {
+class TheGame {
     private game: Phaser.Game;
     // How to control a tank?
     // 1. Update.
@@ -33,7 +33,7 @@ class SimpleGame {
 
         // Set-up inputs.
         for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D ]) {
-            SimpleGame.registerKeyInputs(this, key, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+            TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
         }
 
         // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
@@ -69,12 +69,12 @@ class SimpleGame {
     }
 
     private onKeyDown(e: Phaser.Key) {
-        let addDirection = SimpleGame.mapKeyToDirection(e.event.key);
+        let addDirection = TheGame.mapKeyToDirection(e.event.key);
         MovementHelper.addDirectionIntegral(this._player, addDirection);
     }
 
     private onKeyUp(e: Phaser.Key) {
-        let removeDirection = SimpleGame.mapKeyToDirection(e.event.key);
+        let removeDirection = TheGame.mapKeyToDirection(e.event.key);
         MovementHelper.removeDirectionIntegral(this._player, removeDirection);
     }
     
