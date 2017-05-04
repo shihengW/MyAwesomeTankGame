@@ -95,12 +95,12 @@ class SimpleGame {
 
     private onKeyDown(e: Phaser.Key) {
         let addDirection = SimpleGame.mapKeyToDirection(e.event.key);
-        AdvancedInputManager.addDirectionIntegral(this.player, addDirection);
+        InputManager.addDirectionIntegral(this.player, addDirection);
     }
 
     private onKeyUp(e: Phaser.Key) {
         let removeDirection = SimpleGame.mapKeyToDirection(e.event.key);
-        AdvancedInputManager.removeDirectionIntegral(this.player, removeDirection);
+        InputManager.removeDirectionIntegral(this.player, removeDirection);
     }
     
     private static mapKeyToDirection(key: any) : Directions {
