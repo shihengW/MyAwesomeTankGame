@@ -1,78 +1,3 @@
-/// <reference path="../.ts_dependencies/phaser.d.ts" />
-// TODO: Finish these logic when you have time.
-var AdvancedInputManager = (function () {
-    function AdvancedInputManager() {
-    }
-    AdvancedInputManager.addDirectionIntegral = function (tank, addDirection) {
-        var newDirection = AdvancedInputManager.addDirection(tank.direction, addDirection);
-        tank.setDirection(newDirection);
-    };
-    AdvancedInputManager.removeDirectionIntegral = function (tank, removeDirection) {
-        var newDirection = AdvancedInputManager.removeDirection(tank.direction, removeDirection);
-        tank.setDirection(newDirection);
-    };
-    AdvancedInputManager.addDirection = function (direction, addDirection) {
-        // If direction alread has the added direction, just return. This case may barely happen.
-        if ((direction & addDirection) != 0) {
-            return Directions.None;
-        }
-        var opsiteDirection = AdvancedInputManager.getOpsiteDirection(addDirection);
-        if ((direction & opsiteDirection) != 0) {
-            return direction = direction & (~opsiteDirection);
-        }
-        return direction | addDirection;
-    };
-    AdvancedInputManager.removeDirection = function (direction, removeDirection) {
-        return direction & (~removeDirection);
-    };
-    AdvancedInputManager.getOpsiteDirection = function (direction) {
-        switch (direction) {
-            case Directions.Up: return Directions.Down;
-            case Directions.Down: return Directions.Up;
-            case Directions.Left: return Directions.Right;
-            case Directions.Right: return Directions.Left;
-        }
-        return Directions.None;
-    };
-    AdvancedInputManager.directionToAngle = function (direction) {
-        switch (direction) {
-            case Directions.Up:
-                return 0;
-            case Directions.Down:
-                return 180;
-            case Directions.Left:
-                return -90;
-            case Directions.Right:
-                return 90;
-            case Directions.UpLeft:
-                return -45;
-            case Directions.DownLeft:
-                return 225;
-            case Directions.UpRight:
-                return 45;
-            case Directions.DownRight:
-                return 135;
-            default:
-                return undefined;
-        }
-    };
-    AdvancedInputManager.directionToSpeed = function (direction) {
-        if (direction == Directions.None) {
-            return { x: 0, y: 0 };
-        }
-        var angle = AdvancedInputManager.directionToAngle(direction);
-        return AdvancedInputManager.angleToSpeed(angle);
-    };
-    AdvancedInputManager.angleToSpeed = function (angle) {
-        if (angle == undefined) {
-            return { x: 0, y: 0 };
-        }
-        var angleRad = Phaser.Math.degToRad(angle);
-        return { x: Math.sin(angleRad) * tankSpeed, y: 0 - Math.cos(angleRad) * tankSpeed };
-    };
-    return AdvancedInputManager;
-}());
-/// ********************************************************** /// 
 var Directions;
 (function (Directions) {
     Directions[Directions["None"] = 0] = "None";
@@ -108,51 +33,51 @@ var SimpleGame = (function () {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         // Set-up inputs.
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.W, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.A, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.S, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
-        SimpleGame.registerKeyInputs(this, Phaser.Keyboard.D, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
-        // Add player, give it an id and put it at random location.
+        for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D]; _i < _a.length; _i++) {
+            var key = _a[_i];
+            SimpleGame.registerKeyInputs(this, key, SimpleGame.prototype.onKeyDown, SimpleGame.prototype.onKeyUp);
+        }
+        // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
         var x = Math.floor(this.game.width * Math.random());
         var y = Math.floor(this.game.height * Math.random());
         var id = Math.ceil(Math.random() * 1000);
-        this.player = new Tank(this.game, id, x, y);
+        this._player = new Tank(this.game, id, x, y);
         // Create socket, register events and tell the server
-        this.socket = io();
+        this._socket = io();
         var self = this;
         // TODO: Refactor. I hate these code.
-        this.socket.on(tankUpdateGlobalEventName, function (player) {
+        this._socket.on(tankUpdateGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
             // TODO: At least you should merge the logic.
             if (player.blood <= 0) {
                 // TODO: Refactor these ugly logic.
                 var foundTank_1;
-                self.enemies.forEach(function (item) {
+                self._enemies.forEach(function (item) {
                     if (player.tankId == item.id) {
                         foundTank_1 = item;
                     }
                 });
                 foundTank_1.setByJson(player);
-                var index = self.enemies.indexOf(foundTank_1);
+                var index = self._enemies.indexOf(foundTank_1);
                 if (index > -1) {
-                    self.enemies.splice(index, 1);
+                    self._enemies.splice(index, 1);
                 }
                 // Should also try to destroy the sprite and text.
                 return;
             }
-            if (self.enemies == undefined) {
-                self.enemies = [new Tank(self.game, player.tankId, player.x, player.y)];
+            if (self._enemies == undefined) {
+                self._enemies = [new Tank(self.game, player.tankId, player.x, player.y)];
             }
             else {
                 var exist_1 = false;
-                self.enemies.forEach(function (item) {
+                self._enemies.forEach(function (item) {
                     if (player.tankId == item.id) {
                         item.setByJson(player);
                         exist_1 = true;
                     }
                 });
                 if (!exist_1) {
-                    self.enemies.push(new Tank(self.game, player.tankId, player.x, player.y));
+                    self._enemies.push(new Tank(self.game, player.tankId, player.x, player.y));
                 }
             }
         });
@@ -160,20 +85,20 @@ var SimpleGame = (function () {
     SimpleGame.prototype.update = function () {
         var _this = this;
         // First, update tank itself.
-        var message = this.player.update(this.game.input.activePointer.isDown);
-        this.socket.emit(tankUpdateEventName, message);
+        var message = this._player.update(this.game.input.activePointer.isDown);
+        this._socket.emit(tankUpdateEventName, message);
         // Then, check collision.
-        if (this.enemies != undefined) {
-            this.enemies.forEach(function (enemy) { return _this.player.checkCombatResult(enemy); });
+        if (this._enemies != undefined) {
+            this._enemies.forEach(function (enemy) { return _this._player.checkCombatResult(enemy); });
         }
     };
     SimpleGame.prototype.onKeyDown = function (e) {
         var addDirection = SimpleGame.mapKeyToDirection(e.event.key);
-        AdvancedInputManager.addDirectionIntegral(this.player, addDirection);
+        MovementHelper.addDirectionIntegral(this._player, addDirection);
     };
     SimpleGame.prototype.onKeyUp = function (e) {
         var removeDirection = SimpleGame.mapKeyToDirection(e.event.key);
-        AdvancedInputManager.removeDirectionIntegral(this.player, removeDirection);
+        MovementHelper.removeDirectionIntegral(this._player, removeDirection);
     };
     SimpleGame.mapKeyToDirection = function (key) {
         var direction = Directions.None;
@@ -220,6 +145,81 @@ var SimpleGame = (function () {
 window.onload = function () {
     var game = new SimpleGame();
 };
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
+// TODO: Finish these logic when you have time.
+var MovementHelper = (function () {
+    function MovementHelper() {
+    }
+    MovementHelper.addDirectionIntegral = function (tank, addDirection) {
+        var newDirection = MovementHelper.addDirection(tank.direction, addDirection);
+        tank.setDirection(newDirection);
+    };
+    MovementHelper.removeDirectionIntegral = function (tank, removeDirection) {
+        var newDirection = MovementHelper.removeDirection(tank.direction, removeDirection);
+        tank.setDirection(newDirection);
+    };
+    MovementHelper.addDirection = function (direction, addDirection) {
+        // If direction alread has the added direction, just return. This case may barely happen.
+        if ((direction & addDirection) != 0) {
+            return Directions.None;
+        }
+        var opsiteDirection = MovementHelper.getOpsiteDirection(addDirection);
+        if ((direction & opsiteDirection) != 0) {
+            return direction = direction & (~opsiteDirection);
+        }
+        return direction | addDirection;
+    };
+    MovementHelper.removeDirection = function (direction, removeDirection) {
+        return direction & (~removeDirection);
+    };
+    MovementHelper.getOpsiteDirection = function (direction) {
+        switch (direction) {
+            case Directions.Up: return Directions.Down;
+            case Directions.Down: return Directions.Up;
+            case Directions.Left: return Directions.Right;
+            case Directions.Right: return Directions.Left;
+        }
+        return Directions.None;
+    };
+    MovementHelper.directionToAngle = function (direction) {
+        switch (direction) {
+            case Directions.Up:
+                return 0;
+            case Directions.Down:
+                return 180;
+            case Directions.Left:
+                return -90;
+            case Directions.Right:
+                return 90;
+            case Directions.UpLeft:
+                return -45;
+            case Directions.DownLeft:
+                return 225;
+            case Directions.UpRight:
+                return 45;
+            case Directions.DownRight:
+                return 135;
+            default:
+                return undefined;
+        }
+    };
+    MovementHelper.directionToSpeed = function (direction) {
+        if (direction == Directions.None) {
+            return { x: 0, y: 0 };
+        }
+        var angle = MovementHelper.directionToAngle(direction);
+        return MovementHelper.angleToSpeed(angle);
+    };
+    MovementHelper.angleToSpeed = function (angle) {
+        if (angle == undefined) {
+            return { x: 0, y: 0 };
+        }
+        var angleRad = Phaser.Math.degToRad(angle);
+        return { x: Math.sin(angleRad) * tankSpeed, y: 0 - Math.cos(angleRad) * tankSpeed };
+    };
+    return MovementHelper;
+}());
+/// ********************************************************** /// 
 /// ****** names and parameters. ****** ///
 // Names
 var sandbagName = "sandbag";
@@ -242,45 +242,45 @@ var tankSpeed = 300;
 // TODO: Should use group when figure out how
 var Tank = (function () {
     function Tank(game, id, x, y) {
-        this.gameOver = false;
+        this._gameOver = false;
         this.direction = Directions.None;
         // #endregion Move system
         // #region: Fire system
         this.nextFire = 0;
-        this.ownerGame = game;
+        this._ownerGame = game;
         this.id = id;
-        this.blood = 100;
+        this._blood = 100;
         // Seperate tank body and gun tower.           
-        this.tankbody = game.add.sprite(x, y, tankbodyName);
-        this.guntower = game.add.sprite(x, y, guntowerName);
+        this._tankbody = game.add.sprite(x, y, tankbodyName);
+        this._guntower = game.add.sprite(x, y, guntowerName);
         var style = { font: "20px Arial", fill: "#00A000", align: "center" };
-        this.bloodText = game.add.text(x, y - bloodTextOffset, (this.blood), style);
-        this.tankbody.anchor.set(0.5, 0.5);
-        this.guntower.anchor.set(0.5, 0.5);
-        this.bloodText.anchor.set(0.5, 0.5);
+        this._bloodText = game.add.text(x, y - bloodTextOffset, (this._blood), style);
+        this._tankbody.anchor.set(0.5, 0.5);
+        this._guntower.anchor.set(0.5, 0.5);
+        this._bloodText.anchor.set(0.5, 0.5);
         // Setup physics
-        game.physics.arcade.enable(this.tankbody);
-        this.tankbody.body.collideWorldBounds = true;
-        this.tankbody.body.bounce.set(0.1, 0.1);
-        this.tankbody.body.mass = 100000;
+        game.physics.arcade.enable(this._tankbody);
+        this._tankbody.body.collideWorldBounds = true;
+        this._tankbody.body.bounce.set(0.1, 0.1);
+        this._tankbody.body.mass = 100000;
         // Create bullets.
-        this.bullets = game.add.group();
-        this.bullets.enableBody = true;
-        this.bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this.bullets.createMultiple(30, bulletName);
-        this.bullets.setAll("checkWorldBounds", true);
-        this.bullets.setAll("outOfBoundsKill", true);
-        this.bullets.forEachAlive(function (item) {
+        this._bullets = game.add.group();
+        this._bullets.enableBody = true;
+        this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
+        this._bullets.createMultiple(30, bulletName);
+        this._bullets.setAll("checkWorldBounds", true);
+        this._bullets.setAll("outOfBoundsKill", true);
+        this._bullets.forEachAlive(function (item) {
             item.body.mass = 0.1;
         }, this);
     }
     Tank.prototype.update = function (shouldFire) {
         // If game over, do nothing.
-        if (this.gameOver) {
+        if (this._gameOver) {
             return this.getJson(false);
         }
-        if (this.blood <= 0) {
-            this.gameOver = true;
+        if (this._blood <= 0) {
+            this._gameOver = true;
             Tank.tankExplode(this);
             return this.getJson(false);
         }
@@ -293,22 +293,22 @@ var Tank = (function () {
     };
     // #regions Move system
     Tank.prototype.setDirection = function (d) {
-        if (this.gameOver) {
+        if (this._gameOver) {
             return;
         }
         this.direction = d;
-        var newAngle = AdvancedInputManager.directionToAngle(d);
-        var newSpeed = AdvancedInputManager.directionToSpeed(d);
+        var newAngle = MovementHelper.directionToAngle(d);
+        var newSpeed = MovementHelper.directionToSpeed(d);
         if (newAngle != undefined) {
-            this.tankbody.angle = newAngle;
+            this._tankbody.angle = newAngle;
         }
-        this.tankbody.body.velocity.x = newSpeed.x;
-        this.tankbody.body.velocity.y = newSpeed.y;
+        this._tankbody.body.velocity.x = newSpeed.x;
+        this._tankbody.body.velocity.y = newSpeed.y;
     };
     Tank.prototype.setPosition = function () {
         // First, move gun tower to point to mouse.
-        var angle = Phaser.Math.angleBetweenPoints(this.ownerGame.input.activePointer.position, this.tankbody.body.position);
-        this.guntower.angle = Phaser.Math.radToDeg(angle) - 90;
+        var angle = Phaser.Math.angleBetweenPoints(this._ownerGame.input.activePointer.position, this._tankbody.body.position);
+        this._guntower.angle = Phaser.Math.radToDeg(angle) - 90;
         // Second, move the tank.
         // this.tankbody.body.velocity.set(0, 0);
         // switch (this.direction) {
@@ -320,17 +320,17 @@ var Tank = (function () {
         //     default: break;
         // }
         // Finally, force to coordinate the guntower, tankbody and blood text
-        this.guntower.position = this.tankbody.position;
-        this.bloodText.position = new Phaser.Point(this.tankbody.position.x, this.tankbody.position.y + bloodTextOffset);
-        this.bloodText.text = this.blood;
+        this._guntower.position = this._tankbody.position;
+        this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + bloodTextOffset);
+        this._bloodText.text = this._blood;
     };
     Tank.prototype.shouldFire = function (forceFiring) {
         if (forceFiring === void 0) { forceFiring = false; }
         var shouldFire = false;
-        if (forceFiring || (this.ownerGame.time.now > this.nextFire && this.bullets.countDead() > 0)) {
+        if (forceFiring || (this._ownerGame.time.now > this.nextFire && this._bullets.countDead() > 0)) {
             shouldFire = true;
             // Set the cooldown time.
-            this.nextFire = this.ownerGame.time.now + fireRate;
+            this.nextFire = this._ownerGame.time.now + fireRate;
         }
         return shouldFire;
     };
@@ -338,12 +338,12 @@ var Tank = (function () {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
         var randomAngleOffset = (Math.random() - 0.5) * accuracy;
-        var theta = Phaser.Math.degToRad(this.guntower.angle) + randomAngleOffset;
+        var theta = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
         // Set-up constants.
-        var halfLength = this.guntower.height / 2;
+        var halfLength = this._guntower.height / 2;
         var sinTheta = Math.sin(theta);
         var reverseCosTheta = -1 * Math.cos(theta);
-        var tankPosition = this.tankbody.body.center;
+        var tankPosition = this._tankbody.body.center;
         // Bullet start position and move to position.
         var startX = sinTheta * halfLength + tankPosition.x;
         var startY = reverseCosTheta * halfLength + tankPosition.y;
@@ -354,12 +354,12 @@ var Tank = (function () {
     };
     Tank.prototype.fireCore = function (startX, startY, moveToX, moveToY) {
         // Get bullet.
-        var bullet = this.bullets.getFirstDead();
-        bullet.angle = this.guntower.angle;
+        var bullet = this._bullets.getFirstDead();
+        bullet.angle = this._guntower.angle;
         bullet.anchor.set(0.5, 0.5);
         bullet.reset(startX, startY);
         // bullet.body.angularVelocity = 5000;
-        this.ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, bulletSpeed);
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, bulletSpeed);
     };
     Tank.prototype.fire = function (forceFiring) {
         if (forceFiring === void 0) { forceFiring = false; }
@@ -375,7 +375,7 @@ var Tank = (function () {
         if (Newton) {
             var xguntowerOffset = -1 * trajectory.sinTheta * 5;
             var yguntowerOffset = -1 * trajectory.reverseCosTheta * 5;
-            this.ownerGame.add.tween(this.guntower).to({ x: this.tankbody.position.x + xguntowerOffset, y: this.tankbody.position.y + yguntowerOffset }, 30, Phaser.Easing.Linear.None, true, 0, 0, true);
+            this._ownerGame.add.tween(this._guntower).to({ x: this._tankbody.position.x + xguntowerOffset, y: this._tankbody.position.y + yguntowerOffset }, 30, Phaser.Easing.Linear.None, true, 0, 0, true);
         }
         return true;
     };
@@ -383,7 +383,7 @@ var Tank = (function () {
     // #region: Comms
     Tank.prototype.getJson = function (firing) {
         // If already died, just return an useless message.
-        if (this.gameOver) {
+        if (this._gameOver) {
             return {
                 tankId: this.id,
                 x: -1,
@@ -396,12 +396,12 @@ var Tank = (function () {
         }
         return {
             tankId: this.id,
-            x: this.tankbody.position.x,
-            y: this.tankbody.position.y,
-            gunAngle: this.guntower.angle,
-            tankAngle: this.tankbody.angle,
+            x: this._tankbody.position.x,
+            y: this._tankbody.position.y,
+            gunAngle: this._guntower.angle,
+            tankAngle: this._tankbody.angle,
             firing: firing,
-            blood: this.blood
+            blood: this._blood
         };
     };
     Tank.prototype.setByJson = function (params) {
@@ -409,25 +409,25 @@ var Tank = (function () {
     };
     Tank.prototype.tankUpdateAsPuppet = function (gunAngle, tankAngle, position, firing, blood) {
         // if already gameover, do nothing.
-        if (this.gameOver) {
+        if (this._gameOver) {
             return;
         }
         // if blood is less or equal to 0, set gameover tag, then explode.
-        if (this.blood <= 0) {
-            this.gameOver = true;
+        if (this._blood <= 0) {
+            this._gameOver = true;
             Tank.tankExplode(this);
             return;
         }
-        this.guntower.angle = gunAngle;
-        this.tankbody.angle = tankAngle;
-        this.tankbody.body.velocity.x = 0;
-        this.tankbody.body.velocity.y = 0;
-        this.tankbody.position = position;
-        this.guntower.position = position;
-        this.bloodText.position = new Phaser.Point(position.x, position.y + bloodTextOffset);
-        this.blood = blood;
-        this.bloodText.text = blood;
-        if (this.blood <= 0) {
+        this._guntower.angle = gunAngle;
+        this._tankbody.angle = tankAngle;
+        this._tankbody.body.velocity.x = 0;
+        this._tankbody.body.velocity.y = 0;
+        this._tankbody.position = position;
+        this._guntower.position = position;
+        this._bloodText.position = new Phaser.Point(position.x, position.y + bloodTextOffset);
+        this._blood = blood;
+        this._bloodText.text = blood;
+        if (this._blood <= 0) {
             var self_1 = this;
             Tank.tankExplode(self_1);
         }
@@ -441,25 +441,25 @@ var Tank = (function () {
         var _this = this;
         var self = this;
         // this.ownerGame.physics.arcade.collide(this.tankbody, another);
-        this.bullets.forEachAlive(function (item) {
-            self.ownerGame.physics.arcade.collide(item, another.tankbody, function (bullet, another) { return Tank.bulletHit(bullet, another, self.ownerGame); });
+        this._bullets.forEachAlive(function (item) {
+            self._ownerGame.physics.arcade.collide(item, another._tankbody, function (bullet, another) { return Tank.bulletHit(bullet, another, self._ownerGame); });
         }, this);
-        another.bullets.forEachAlive(function (item) {
-            self.ownerGame.physics.arcade.collide(item, self.tankbody, function (bullet, another) {
-                Tank.bulletHit(bullet, another, self.ownerGame);
-                _this.blood -= damage;
+        another._bullets.forEachAlive(function (item) {
+            self._ownerGame.physics.arcade.collide(item, self._tankbody, function (bullet, another) {
+                Tank.bulletHit(bullet, another, self._ownerGame);
+                _this._blood -= damage;
             });
         }, this);
     };
     Tank.tankExplode = function (self) {
         // Emit and destroy everything.
-        var emitter = self.ownerGame.add.emitter(self.tankbody.position.x, self.tankbody.position.y);
+        var emitter = self._ownerGame.add.emitter(self._tankbody.position.x, self._tankbody.position.y);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(500, 50);
-        self.tankbody.destroy();
-        self.guntower.destroy();
-        self.bloodText.destroy();
-        self.bullets.destroy();
+        self._tankbody.destroy();
+        self._guntower.destroy();
+        self._bloodText.destroy();
+        self._bullets.destroy();
     };
     Tank.bulletHit = function (bullet, another, game) {
         bullet.kill();
