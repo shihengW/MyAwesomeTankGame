@@ -1,9 +1,9 @@
-interface UpdateMessage {
+interface Message {
     tankId: number,
     x: number,
     y: number,
     gunAngle: number,
     tankAngle: number,
-    firing: boolean,
+    firing: number, // angle.
     blood: number
 }

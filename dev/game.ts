@@ -3,6 +3,10 @@
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 class SimpleGame {
     private game: Phaser.Game;
+    // How to control a tank?
+    // 1. Update.
+    // 2. Check collision.
+    // 3. Update by json.
     private _player: Tank;
     private _enemies: Tank[];
     private _socket: any;
@@ -42,39 +46,11 @@ class SimpleGame {
         this._socket = io();
         let self = this;
         // TODO: Refactor. I hate these code.
-        this._socket.on(tankUpdateGlobalEventName, function(player: UpdateMessage) {
+        this._socket.on(tankUpdateGlobalEventName, function(player: Message) {
+               self.updateEnemyByJson(player);
                // If player has no blood, remove it from the list.
-               // TODO: At least you should merge the logic.
                if (player.blood <= 0) {
-                   // TODO: Refactor these ugly logic.
-                   let foundTank: Tank;
-                   self._enemies.forEach(item => {
-                        if (player.tankId == item.id) {
-                            foundTank = item;
-                        }});
-                   foundTank.setByJson(player);
-                   let index = self._enemies.indexOf(foundTank);
-                   if (index > -1) {
-                        self._enemies.splice(index, 1);                    
-                   }
-                   // Should also try to destroy the sprite and text.
-                   return;
-               }
-
-               if (self._enemies == undefined) {
-                   self._enemies = [new Tank(self.game, player.tankId, player.x, player.y)];
-               }
-               else {
-                    let exist: boolean = false;
-                    self._enemies.forEach(item => {
-                        if (player.tankId == item.id) {
-                            item.setByJson(player);
-                            exist = true;
-                        } 
-                    });
-                    if (!exist) {
-                        self._enemies.push(new Tank(self.game, player.tankId, player.x, player.y));
-                    }
+                   self.removeEnemyByJson(player);
                }
          });  
     }
@@ -88,7 +64,7 @@ class SimpleGame {
 
         // Then, check collision.
         if (this._enemies != undefined) {
-            this._enemies.forEach(enemy => this._player.checkCombatResult(enemy));
+            this._enemies.forEach(enemy => this._player.combat(enemy));
         }
     }
 
@@ -102,6 +78,47 @@ class SimpleGame {
         MovementHelper.removeDirectionIntegral(this._player, removeDirection);
     }
     
+    private removeEnemyByJson(enemy: Message): Tank {
+        // TODO: Refactor these ugly logic.
+        let foundTank: Tank = undefined;
+        this._enemies.forEach(item => {
+            if (enemy.tankId == item.id) {
+                foundTank = item;
+            }});
+        let index = this._enemies.indexOf(foundTank);
+        if (index > -1) { 
+            this._enemies.splice(index, 1); 
+        }
+
+        return foundTank;
+    }
+
+    private updateEnemyByJson(enemy: Message) {
+        if (this._enemies == undefined) {
+            this._enemies = [new Tank(this.game, enemy.tankId, enemy.x, enemy.y)];
+        }
+        else {
+            let exist: boolean = false;
+            this._enemies.forEach(item => {
+                if (enemy.tankId == item.id) {
+                    item.updateByJson(enemy);
+                    exist = true;
+                } 
+            });
+            if (!exist) {
+                this._enemies.push(new Tank(this.game, enemy.tankId, enemy.x, enemy.y));
+            }
+        }
+    }
+
+// #region: statics.
+
+    private static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
+        let realKey = self.game.input.keyboard.addKey(key);
+        if (keydownHandler != null) realKey.onDown.add(keydownHandler, self);
+        if (keyupHandler != null) realKey.onUp.add(keyupHandler, self);
+    }
+
     private static mapKeyToDirection(key: any) : Directions {
         let direction: Directions = Directions.None;
         switch (key) {
@@ -111,12 +128,6 @@ class SimpleGame {
             case "d": direction = Directions.Right; break;
         }
         return direction;
-    }
-
-    private static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
-        let realKey = self.game.input.keyboard.addKey(key);
-        if (keydownHandler != null) realKey.onDown.add(keydownHandler, self);
-        if (keyupHandler != null) realKey.onUp.add(keyupHandler, self);
     }
 
     private static createSandbagAndMakeItMove(game: Phaser.Game) : Phaser.Sprite {
@@ -135,4 +146,5 @@ class SimpleGame {
         game.physics.arcade.accelerateToXY(sandbag, game.width / 2, game.height / 2 - 50, 100);
         return sandbag;
     }
+// #endregion
 }

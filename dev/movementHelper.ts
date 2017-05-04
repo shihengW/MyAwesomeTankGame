@@ -3,12 +3,12 @@
 class MovementHelper {
     static addDirectionIntegral(tank: Tank, addDirection: Directions) {
         let newDirection: Directions = MovementHelper.addDirection(tank.direction, addDirection);
-        tank.setDirection(newDirection);
+        tank.drive(newDirection);
     }
 
     static removeDirectionIntegral(tank: Tank, removeDirection: Directions) {
         let newDirection: Directions = MovementHelper.removeDirection(tank.direction, removeDirection);
-        tank.setDirection(newDirection);
+        tank.drive(newDirection);
     }
 
     static addDirection(direction: Directions, addDirection: Directions): Directions {

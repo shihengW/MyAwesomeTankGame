@@ -48,30 +48,31 @@ class Tank {
             item.body.mass = 0.1; }, this);
     }
 
-    update(shouldFire): UpdateMessage {
+    update(shouldFire): Message {
         // If game over, do nothing.
-        if (this._gameOver) {
-            return this.getJson(false);
-        }
-
+        if (this._gameOver) { return this.getJson(undefined); }
         if (this._blood <= 0) {
             this._gameOver = true;
-            Tank.tankExplode(this);
-            return this.getJson(false);
+            Tank.onExplode(this);
+            return this.getJson(undefined);
         }
 
-        let fire: boolean = false;
-        this.setPosition();
-        
-        if (shouldFire) {
-            fire = this.fire();
-        }
+        // Move.
+        this.syncPosition();
 
+        // Fire.
+        let fire: number = undefined;
+        if (shouldFire) { fire = this.fire(undefined); }
+
+        // Return result.
         return this.getJson(fire);
     }
 
-// #regions Move system
-    setDirection(d: Directions) {
+    updateByJson(params: Message) {
+        this.updateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
+    }
+
+    drive(d: Directions) {
         if (this._gameOver) {
             return;
         }
@@ -87,47 +88,48 @@ class Tank {
         this._tankbody.body.velocity.y = newSpeed.y;
     }
 
-    private setPosition() {
+    combat(another: Tank) {
+        let self = this;
+
+        // this.ownerGame.physics.arcade.collide(this.tankbody, another);
+        this._bullets.forEachAlive((item:Phaser.Sprite) => {
+            self._ownerGame.physics.arcade.collide(item, another._tankbody, 
+                (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.onHit(bullet, another, self._ownerGame));
+        }, this);
+
+        another._bullets.forEachAlive((item:Phaser.Sprite) => {
+            self._ownerGame.physics.arcade.collide(item, self._tankbody, 
+                (bullet: Phaser.Sprite, another: Phaser.Sprite) => {
+                    Tank.onHit(bullet, another, self._ownerGame);
+                    this._blood -= Math.random() * damage;   
+                });
+        }, this);
+    }
+
+// #regions privates.
+    private syncPosition() {
         // First, move gun tower to point to mouse.
         const angle: number = Phaser.Math.angleBetweenPoints(this._ownerGame.input.activePointer.position, this._tankbody.body.position);
         this._guntower.angle = Phaser.Math.radToDeg(angle) - 90;
 
-        // Second, move the tank.
-        // this.tankbody.body.velocity.set(0, 0);
-        // switch (this.direction) {
-        //     case Directions.None: break;
-        //     case Directions.Up: this.tankbody.position.add(0, -1 * tankSpeed); break;
-        //     case Directions.Down: this.tankbody.position.add(0, tankSpeed); break;
-        //     case Directions.Left: this.tankbody.position.add(-1 * tankSpeed, 0); break;
-        //     case Directions.Right: this.tankbody.position.add(tankSpeed, 0); break;
-        //     default: break;
-        // }
-
-        // Finally, force to coordinate the guntower, tankbody and blood text
+        // Second, force to coordinate the guntower, tankbody and blood text
         this._guntower.position = this._tankbody.position;
-        this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + bloodTextOffset);
+        this._bloodText.position = new Phaser.Point(this._tankbody.position.x, 
+            this._tankbody.position.y + bloodTextOffset);
         this._bloodText.text = <string><any>this._blood;
     }
-// #endregion Move system
 
-// #region: Fire system
+    private nextFireTime: number = 0;
 
-    private nextFire: number = 0;
-
-    private shouldFire(forceFiring: boolean = false): boolean {
-        let shouldFire = false;
-        if (forceFiring || (this._ownerGame.time.now > this.nextFire && this._bullets.countDead() > 0)) {
-            shouldFire = true;
-            // Set the cooldown time.
-            this.nextFire = this._ownerGame.time.now + fireRate;
-        }
-        return shouldFire;
+    private shouldFire(firingTo: number): boolean {
+        return firingTo != undefined
+            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
     }
 
     private calculateTrajectory(): Trajectory {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
-        const randomAngleOffset: number = (Math.random() - 0.5) * accuracy;
+        const randomAngleOffset: number = (Math.random() - 0.5) * angleOffsetBase;
         const theta: number = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
 
         // Set-up constants.
@@ -146,7 +148,7 @@ class Tank {
             startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
     }
 
-    private fireCore(startX: number, startY: number, moveToX: number, moveToY: number) {
+    private fireInternal(startX: number, startY: number, moveToX: number, moveToY: number) {
         // Get bullet.
         const bullet: Phaser.Sprite = this._bullets.getFirstDead();
         bullet.angle = this._guntower.angle;
@@ -156,16 +158,23 @@ class Tank {
         this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, bulletSpeed);
     }
 
-    private fire(forceFiring: boolean = false) : boolean {
-        if (!this.shouldFire(forceFiring)) {
-            return false;
+    private fire(firingTo: number = undefined) : number {
+        if (!this.shouldFire(firingTo)) {
+            return undefined;
         }
+
+        // Set time.
+        this.nextFireTime = this._ownerGame.time.now + fireRate;
 
         // Calculate the trajectory.
         let trajectory: Trajectory = this.calculateTrajectory();
+
+        if (firingTo != undefined) {
+            trajectory.theta = firingTo;
+        }
         
         // Fire.
-        this.fireCore(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
+        this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
         
         // Just move the guntower a little bit to simulate the Newton's second law.
         let Newton = true;
@@ -176,13 +185,10 @@ class Tank {
                 { x: this._tankbody.position.x + xguntowerOffset, y: this._tankbody.position.y + yguntowerOffset }, 
                 30, Phaser.Easing.Linear.None, true, 0, 0, true);
         }
-        return true;
+        return trajectory.theta;
     }
-// #endregion: Fire system
 
-// #region: Comms
-
-    private getJson(firing: boolean) : UpdateMessage {
+    private getJson(firingTo: number) : Message {
         // If already died, just return an useless message.
         if (this._gameOver) {
             return {
@@ -191,7 +197,7 @@ class Tank {
                 y: -1,
                 gunAngle: 0,
                 tankAngle: 0,
-                firing: false,
+                firing: undefined,
                 blood: 0
             };
         }
@@ -202,17 +208,13 @@ class Tank {
             y: this._tankbody.position.y,
             gunAngle: this._guntower.angle,
             tankAngle: this._tankbody.angle,
-            firing: firing,
+            firing: firingTo,
             blood: this._blood
         }
     }
 
-    setByJson(params: UpdateMessage) {
-        this.tankUpdateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
-    }
-
-    private tankUpdateAsPuppet(gunAngle: number, tankAngle: number, 
-        position: Phaser.Point, firing: boolean, blood: number) {
+    private updateAsPuppet(gunAngle: number, tankAngle: number, 
+        position: Phaser.Point, firing: number, blood: number) {
         // if already gameover, do nothing.
         if (this._gameOver) {
             return;
@@ -221,7 +223,7 @@ class Tank {
         // if blood is less or equal to 0, set gameover tag, then explode.
         if (this._blood <= 0) {
             this._gameOver = true;
-            Tank.tankExplode(this);
+            Tank.onExplode(this);
             return;
         }
 
@@ -239,37 +241,15 @@ class Tank {
         this._bloodText.text = <string><any>blood;
         if (this._blood <= 0) {
             let self = this;
-            Tank.tankExplode(self);
+            Tank.onExplode(self);
         }
 
-        if (firing) {
+        if (firing != undefined) {
             this.fire(firing);
         }
     }
 
-// #endregion: Comms
-
-// #region: Physics and effects
-
-    checkCombatResult(another: Tank) {
-        let self = this;
-
-        // this.ownerGame.physics.arcade.collide(this.tankbody, another);
-        this._bullets.forEachAlive((item:Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, another._tankbody, 
-                (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.bulletHit(bullet, another, self._ownerGame));
-        }, this);
-
-        another._bullets.forEachAlive((item:Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, self._tankbody, 
-                (bullet: Phaser.Sprite, another: Phaser.Sprite) => {
-                    Tank.bulletHit(bullet, another, self._ownerGame);
-                    this._blood -= damage;   
-                });
-        }, this);
-    }    
-
-    private static tankExplode(self: Tank) {
+    private static onExplode(self: Tank) {
         // Emit and destroy everything.
         let emitter = self._ownerGame.add.emitter(self._tankbody.position.x, self._tankbody.position.y);
         emitter.makeParticles(particleName, 0, 50, false, false);
@@ -281,14 +261,13 @@ class Tank {
         self._bullets.destroy();
     }
 
-    private static bulletHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {
+    private static onHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
         let emitter = game.add.emitter((bullet.x + another.body.x) / 2, (bullet.y + another.body.y) / 2);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
     }
-
-// #endregion: Physics and effects
+// #endregion
 }
 /// ********************************************************** ///
