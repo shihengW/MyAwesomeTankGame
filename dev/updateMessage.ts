@@ -1,4 +1,4 @@
-interface IUpdatemessage {
+interface UpdateMessage {
     tankId: number,
     x: number,
     y: number,

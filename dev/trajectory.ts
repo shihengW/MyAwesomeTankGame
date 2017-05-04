@@ -1,4 +1,4 @@
-interface ITrajectory {
+interface Trajectory {
     // The angle of guntower in rad.
     theta: number,
     // sin(theta) for fast calculate.

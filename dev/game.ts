@@ -2,30 +2,30 @@
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 class SimpleGame {
-    private game: Phaser.Game;
-    private player: Tank;
-    private enemies: Tank[];
-    private socket: any;
+    private _game: Phaser.Game;
+    private _player: Tank;
+    private _enemies: Tank[];
+    private _socket: any;
 
     constructor() {
-        this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
+        this._game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
     }
 
     preload() {
-        this.game.load.image(sandbagName, "../resources/tank.png");
-        this.game.load.image(bulletName, "../resources/bullet.png");
-        this.game.load.image(particleName, "../resources/particle.png");
-        this.game.load.image(tankbodyName, "../resources/tankbody.png");
-        this.game.load.image(guntowerName, "../resources/guntower.png");
-        this.game.stage.disableVisibilityChange = true;
+        this._game.load.image(sandbagName, "../resources/tank.png");
+        this._game.load.image(bulletName, "../resources/bullet.png");
+        this._game.load.image(particleName, "../resources/particle.png");
+        this._game.load.image(tankbodyName, "../resources/tankbody.png");
+        this._game.load.image(guntowerName, "../resources/guntower.png");
+        this._game.stage.disableVisibilityChange = true;
     }
 
     create() {
         // Set-up physics.
-        this.game.physics.startSystem(Phaser.Physics.ARCADE);
+        this._game.physics.startSystem(Phaser.Physics.ARCADE);
 
         // Set-up inputs.
         for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D ]) {
@@ -33,47 +33,47 @@ class SimpleGame {
         }
 
         // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
-        let x = Math.floor(this.game.width * Math.random());
-        let y = Math.floor(this.game.height * Math.random());
+        let x = Math.floor(this._game.width * Math.random());
+        let y = Math.floor(this._game.height * Math.random());
         let id = Math.ceil(Math.random() * 1000);
-        this.player = new Tank(this.game, id, x, y);
+        this._player = new Tank(this._game, id, x, y);
         
         // Create socket, register events and tell the server
-        this.socket = io();
+        this._socket = io();
         let self = this;
         // TODO: Refactor. I hate these code.
-        this.socket.on(tankUpdateGlobalEventName, function(player: IUpdatemessage) {
+        this._socket.on(tankUpdateGlobalEventName, function(player: UpdateMessage) {
                // If player has no blood, remove it from the list.
                // TODO: At least you should merge the logic.
                if (player.blood <= 0) {
                    // TODO: Refactor these ugly logic.
                    let foundTank: Tank;
-                   self.enemies.forEach(item => {
+                   self._enemies.forEach(item => {
                         if (player.tankId == item.id) {
                             foundTank = item;
                         }});
                    foundTank.setByJson(player);
-                   let index = self.enemies.indexOf(foundTank);
+                   let index = self._enemies.indexOf(foundTank);
                    if (index > -1) {
-                        self.enemies.splice(index, 1);                    
+                        self._enemies.splice(index, 1);                    
                    }
                    // Should also try to destroy the sprite and text.
                    return;
                }
 
-               if (self.enemies == undefined) {
-                   self.enemies = [new Tank(self.game, player.tankId, player.x, player.y)];
+               if (self._enemies == undefined) {
+                   self._enemies = [new Tank(self._game, player.tankId, player.x, player.y)];
                }
                else {
                     let exist: boolean = false;
-                    self.enemies.forEach(item => {
+                    self._enemies.forEach(item => {
                         if (player.tankId == item.id) {
                             item.setByJson(player);
                             exist = true;
                         } 
                     });
                     if (!exist) {
-                        self.enemies.push(new Tank(self.game, player.tankId, player.x, player.y));
+                        self._enemies.push(new Tank(self._game, player.tankId, player.x, player.y));
                     }
                }
          });  
@@ -83,23 +83,23 @@ class SimpleGame {
 
     update() {
         // First, update tank itself.
-        let message = this.player.update(this.game.input.activePointer.isDown);
-        this.socket.emit(tankUpdateEventName, message);
+        let message = this._player.update(this._game.input.activePointer.isDown);
+        this._socket.emit(tankUpdateEventName, message);
 
         // Then, check collision.
-        if (this.enemies != undefined) {
-            this.enemies.forEach(enemy => this.player.checkCombatResult(enemy));
+        if (this._enemies != undefined) {
+            this._enemies.forEach(enemy => this._player.checkCombatResult(enemy));
         }
     }
 
     private onKeyDown(e: Phaser.Key) {
         let addDirection = SimpleGame.mapKeyToDirection(e.event.key);
-        MovementHelper.addDirectionIntegral(this.player, addDirection);
+        MovementHelper.addDirectionIntegral(this._player, addDirection);
     }
 
     private onKeyUp(e: Phaser.Key) {
         let removeDirection = SimpleGame.mapKeyToDirection(e.event.key);
-        MovementHelper.removeDirectionIntegral(this.player, removeDirection);
+        MovementHelper.removeDirectionIntegral(this._player, removeDirection);
     }
     
     private static mapKeyToDirection(key: any) : Directions {
