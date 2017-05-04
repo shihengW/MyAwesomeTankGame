@@ -8,16 +8,16 @@
 
 ## Plan: 
 ### 1. Collision, physics and move
-####   [Done] 1.1. Sand bag
-####   [Done] 1.2. X direction
-####   [Working] 1.3. Bug fixing and small improvement
+####   *[Done]* 1.1. Sand bag
+####   *[Done]* 1.2. X direction
+####   *[Working]* 1.3. Bug fixing and small improvement
 
 ### 2. Gun towner controlled by mouse
 
 ### 3. Multi-users
-####   [Done] 3.1. Set-up
-####   [Working] 3.2. Health
-####   [Working] 3.3. Bug-fixing
+####   *[Done]* 3.1. Set-up
+####   *[Working]* 3.2. Health
+####   *[Working]* 3.3. Bug-fixing
 
 ### 4. Animations, better visual, better physics
 ####   4.1. Sprite sheet
