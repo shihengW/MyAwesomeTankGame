@@ -15,7 +15,6 @@ var Directions;
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var TheGame = (function () {
     function TheGame() {
-        this.nextUpdate = 0;
         this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
@@ -45,14 +44,34 @@ var TheGame = (function () {
         // Create socket, register events and tell the server
         this._socket = io();
         var self = this;
-        // TODO: Refactor. I hate these code.
+        // Add new -> show.
+        this._socket.on(addNewGlobalEventName, function (player) {
+            TheGame.updateEnemyByJson(self, player);
+        });
+        // Update -> update.
         this._socket.on(tankUpdateGlobalEventName, function (player) {
-            self.updateEnemyByJson(player);
+            TheGame.updateEnemyByJson(self, player);
+        });
+        // Hit -> hit.
+        this._socket.on(hitGlobalEventName, function (player) {
+            var tank = TheGame.getOrAddEnemy(self, player);
             // If player has no blood, remove it from the list.
             if (player.blood <= 0) {
-                self.removeEnemyByJson(player);
+                TheGame.removeEnemyByJson(self, player);
+                tank.explode();
+            }
+            else {
+                tank.hitEffect(player.hitX, player.hitY);
             }
         });
+        this._socket.on(goneGlobalEventName, function (player) {
+            // If player has no blood, remove it from the list.
+            var tank = TheGame.removeEnemyByJson(self, player);
+            tank.explode();
+        });
+        // Finally, let others know me.
+        this._socket.emit(addNewEventName, { tankId: id, x: x, y: y,
+            gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
     };
     TheGame.prototype.update = function () {
         var _this = this;
@@ -61,9 +80,15 @@ var TheGame = (function () {
         this._socket.emit(tankUpdateEventName, message);
         // Then, check collision.
         if (this._enemies != undefined) {
-            this._enemies.forEach(function (enemy) { return _this._player.combat(enemy); });
+            this._enemies.forEach(function (enemy) {
+                var hitMessage = _this._player.combat(enemy);
+                if (hitMessage != undefined) {
+                    _this._socket.emit(hitEventName, hitMessage);
+                }
+            });
         }
     };
+    // #region: privates.
     TheGame.prototype.onKeyDown = function (e) {
         var addDirection = TheGame.mapKeyToDirection(e.event.key);
         MovementHelper.addDirectionIntegral(this._player, addDirection);
@@ -72,38 +97,45 @@ var TheGame = (function () {
         var removeDirection = TheGame.mapKeyToDirection(e.event.key);
         MovementHelper.removeDirectionIntegral(this._player, removeDirection);
     };
-    TheGame.prototype.removeEnemyByJson = function (enemy) {
+    TheGame.removeEnemyByJson = function (self, enemy) {
         // TODO: Refactor these ugly logic.
         var foundTank = undefined;
-        this._enemies.forEach(function (item) {
+        self._enemies.forEach(function (item) {
             if (enemy.tankId == item.id) {
                 foundTank = item;
             }
         });
-        var index = this._enemies.indexOf(foundTank);
+        var index = self._enemies.indexOf(foundTank);
         if (index > -1) {
-            this._enemies.splice(index, 1);
+            self._enemies.splice(index, 1);
         }
         return foundTank;
     };
-    TheGame.prototype.updateEnemyByJson = function (enemy) {
-        if (this._enemies == undefined) {
-            this._enemies = [new Tank(this.game, enemy.tankId, enemy.x, enemy.y)];
+    TheGame.getOrAddEnemy = function (self, enemy) {
+        var tank = undefined;
+        if (self._enemies == undefined) {
+            tank = new Tank(self.game, enemy.tankId, 0, 0);
+            self._enemies = [tank];
         }
         else {
             var exist_1 = false;
-            this._enemies.forEach(function (item) {
+            self._enemies.forEach(function (item) {
                 if (enemy.tankId == item.id) {
-                    item.updateByJson(enemy);
+                    tank = item;
                     exist_1 = true;
                 }
             });
             if (!exist_1) {
-                this._enemies.push(new Tank(this.game, enemy.tankId, enemy.x, enemy.y));
+                tank = new Tank(self.game, enemy.tankId, 0, 0);
+                self._enemies.push(tank);
             }
         }
+        return tank;
     };
-    // #region: statics.
+    TheGame.updateEnemyByJson = function (self, enemy) {
+        var tank = TheGame.getOrAddEnemy(self, enemy);
+        tank.updateByJson(enemy);
+    };
     TheGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
         var realKey = self.game.input.keyboard.addKey(key);
         if (keydownHandler != null)
@@ -235,6 +267,12 @@ var particleName = "particle";
 // just a notify.
 var tankUpdateEventName = "tankUpdate";
 var tankUpdateGlobalEventName = "tankUpdateGlobal";
+var addNewEventName = "addNew";
+var addNewGlobalEventName = "addNewGlobal";
+var goneEventName = "gone";
+var goneGlobalEventName = "goneGlobal";
+var hitEventName = "hit";
+var hitGlobalEventName = "hitGlobal";
 // Parameters  
 var playerSpeed = 100;
 var fireRate = 300;
@@ -269,7 +307,7 @@ var Tank = (function () {
         this._bullets = game.add.group();
         this._bullets.enableBody = true;
         this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this._bullets.createMultiple(30, bulletName);
+        this._bullets.createMultiple(5, bulletName);
         this._bullets.setAll("checkWorldBounds", true);
         this._bullets.setAll("outOfBoundsKill", true);
         this._bullets.forEachAlive(function (item) {
@@ -313,18 +351,25 @@ var Tank = (function () {
         this._tankbody.body.velocity.y = newSpeed.y;
     };
     Tank.prototype.combat = function (another) {
-        var _this = this;
         var self = this;
-        // this.ownerGame.physics.arcade.collide(this.tankbody, another);
-        this._bullets.forEachAlive(function (item) {
-            self._ownerGame.physics.arcade.collide(item, another._tankbody, function (bullet, another) { return Tank.onHit(bullet, another, self._ownerGame); });
-        }, this);
         another._bullets.forEachAlive(function (item) {
-            self._ownerGame.physics.arcade.collide(item, self._tankbody, function (bullet, another) {
-                Tank.onHit(bullet, another, self._ownerGame);
-                _this._blood -= Math.random() * damage;
+            self._ownerGame.physics.arcade.collide(item, self._tankbody, function (bullet, notUsed) {
+                return self.onHit(bullet);
             });
         }, this);
+        this._bullets.forEachAlive(function (item) {
+            self._ownerGame.physics.arcade.collide(item, another, function () { item.kill(); });
+        }, this);
+        return undefined;
+    };
+    Tank.prototype.explode = function () {
+        var self = this;
+        Tank.onExplode(self);
+    };
+    Tank.prototype.hitEffect = function (x, y) {
+        var emitter = this._ownerGame.add.emitter(x, y);
+        emitter.makeParticles(particleName, 0, 50, false, false);
+        emitter.explode(300, 50);
     };
     // #regions privates.
     Tank.prototype.syncPosition = function () {
@@ -451,12 +496,21 @@ var Tank = (function () {
         self._bloodText.destroy();
         self._bullets.destroy();
     };
-    Tank.onHit = function (bullet, another, game) {
+    Tank.prototype.onHit = function (bullet) {
+        this._blood -= Math.random() * damage;
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
-        var emitter = game.add.emitter((bullet.x + another.body.x) / 2, (bullet.y + another.body.y) / 2);
+        var hitX = (bullet.x + this._tankbody.body.x) / 2;
+        var hitY = (bullet.y + this._tankbody.body.y) / 2;
+        var emitter = this._ownerGame.add.emitter(hitX, hitY);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
+        return {
+            tankId: this.id,
+            hitX: hitX,
+            hitY: hitY,
+            blood: this._blood
+        };
     };
     return Tank;
 }());

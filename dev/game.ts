@@ -45,17 +45,39 @@ class TheGame {
         // Create socket, register events and tell the server
         this._socket = io();
         let self = this;
-        // TODO: Refactor. I hate these code.
-        this._socket.on(tankUpdateGlobalEventName, function(player: Message) {
-               self.updateEnemyByJson(player);
-               // If player has no blood, remove it from the list.
-               if (player.blood <= 0) {
-                   self.removeEnemyByJson(player);
-               }
-         });  
-    }
+        // Add new -> show.
+        this._socket.on(addNewGlobalEventName, function(player: Message) {
+            TheGame.updateEnemyByJson(self, player);
+        });
 
-    private nextUpdate: number = 0;
+        // Update -> update.
+        this._socket.on(tankUpdateGlobalEventName, function(player: Message) {
+            TheGame.updateEnemyByJson(self, player);
+         });
+
+        // Hit -> hit.
+        this._socket.on(hitGlobalEventName, function(player: HitMessage) {
+            let tank = TheGame.getOrAddEnemy(self, player);
+            // If player has no blood, remove it from the list.
+            if (player.blood <= 0) {
+                TheGame.removeEnemyByJson(self, player);
+                tank.explode();
+            }
+            else {
+                tank.hitEffect(player.hitX, player.hitY);
+            }
+        });
+
+        this._socket.on(goneGlobalEventName, function(player: Message) {
+            // If player has no blood, remove it from the list.
+            let tank = TheGame.removeEnemyByJson(self, player);
+            tank.explode();
+        });
+
+        // Finally, let others know me.
+        this._socket.emit(addNewEventName, { tankId: id, x: x, y: y,
+            gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
+    }
 
     update() {
         // First, update tank itself.
@@ -64,10 +86,16 @@ class TheGame {
 
         // Then, check collision.
         if (this._enemies != undefined) {
-            this._enemies.forEach(enemy => this._player.combat(enemy));
+            this._enemies.forEach(enemy => {
+                let hitMessage = this._player.combat(enemy);
+                if (hitMessage != undefined) {
+                    this._socket.emit(hitEventName, hitMessage);
+                }
+            });
         }
     }
 
+// #region: privates.
     private onKeyDown(e: Phaser.Key) {
         let addDirection = TheGame.mapKeyToDirection(e.event.key);
         MovementHelper.addDirectionIntegral(this._player, addDirection);
@@ -78,40 +106,47 @@ class TheGame {
         MovementHelper.removeDirectionIntegral(this._player, removeDirection);
     }
     
-    private removeEnemyByJson(enemy: Message): Tank {
+    private static removeEnemyByJson(self: TheGame, enemy: IdMessage): Tank {
         // TODO: Refactor these ugly logic.
         let foundTank: Tank = undefined;
-        this._enemies.forEach(item => {
+        self._enemies.forEach(item => {
             if (enemy.tankId == item.id) {
                 foundTank = item;
             }});
-        let index = this._enemies.indexOf(foundTank);
+        let index = self._enemies.indexOf(foundTank);
         if (index > -1) { 
-            this._enemies.splice(index, 1); 
+            self._enemies.splice(index, 1); 
         }
 
         return foundTank;
     }
 
-    private updateEnemyByJson(enemy: Message) {
-        if (this._enemies == undefined) {
-            this._enemies = [new Tank(this.game, enemy.tankId, enemy.x, enemy.y)];
+    private static getOrAddEnemy(self: TheGame, enemy: IdMessage) : Tank {
+        let tank: Tank = undefined;
+        if (self._enemies == undefined) {
+            tank = new Tank(self.game, enemy.tankId, 0, 0)
+            self._enemies = [tank];
         }
         else {
             let exist: boolean = false;
-            this._enemies.forEach(item => {
+            self._enemies.forEach(item => {
                 if (enemy.tankId == item.id) {
-                    item.updateByJson(enemy);
+                    tank = item;
                     exist = true;
                 } 
             });
             if (!exist) {
-                this._enemies.push(new Tank(this.game, enemy.tankId, enemy.x, enemy.y));
+                tank = new Tank(self.game, enemy.tankId, 0, 0);
+                self._enemies.push(tank);
             }
         }
+        return tank;
     }
 
-// #region: statics.
+    private static updateEnemyByJson(self: TheGame, enemy: Message) {
+        let tank = TheGame.getOrAddEnemy(self, enemy);
+        tank.updateByJson(enemy)
+    }
 
     private static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
         let realKey = self.game.input.keyboard.addKey(key);

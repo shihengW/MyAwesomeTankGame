@@ -16,14 +16,29 @@ io.on('connection', function(socket) {
   var id;
 
   // When anything updated.
-  socket.on("tankUpdate", function(client) {
+  socket.on("addNew", function(client) {
     id = client.tankId;
+    socket.broadcast.emit("addNewGlobal", client);
+  });
+
+  // When anything updated.
+  socket.on("tankUpdate", function(client) {
     socket.broadcast.emit("tankUpdateGlobal", client);
   });
 
   // When client disconnected.
-  socket.on('disconnect', function () {
-    socket.broadcast.emit("disconnectGlobal", { tankId: id });
+  socket.on('disconnect', function() {
+    socket.broadcast.emit("goneGlobal", { tankId: id });
+  });
+
+  // When client disconnected.
+  socket.on('gone', function() {
+    socket.broadcast.emit("goneGlobal", { tankId: id });
+  });
+
+  // When anything updated.
+  socket.on("hit", function(client) {
+    socket.broadcast.emit("hitGlobal", client);
   });
 });
 

@@ -10,6 +10,12 @@ const particleName: string = "particle";
 // just a notify.
 const tankUpdateEventName: string = "tankUpdate";
 const tankUpdateGlobalEventName: string = "tankUpdateGlobal";
+const addNewEventName: string = "addNew";
+const addNewGlobalEventName: string = "addNewGlobal";
+const goneEventName: string = "gone";
+const goneGlobalEventName: string = "goneGlobal";
+const hitEventName: string = "hit";
+const hitGlobalEventName: string = "hitGlobal";
 
 // Parameters  
 const playerSpeed: number = 100;

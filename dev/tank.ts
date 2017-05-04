@@ -40,11 +40,12 @@ class Tank {
         this._bullets = game.add.group();
         this._bullets.enableBody = true;
         this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this._bullets.createMultiple(30, bulletName);
+        this._bullets.createMultiple(5, bulletName);
 
         this._bullets.setAll("checkWorldBounds", true);
         this._bullets.setAll("outOfBoundsKill", true);
         this._bullets.forEachAlive((item:Phaser.Sprite) => { 
+            item.body.bounce.set(0.1, 0.1);
             item.body.mass = 0.1; }, this);
     }
 
@@ -88,22 +89,31 @@ class Tank {
         this._tankbody.body.velocity.y = newSpeed.y;
     }
 
-    combat(another: Tank) {
+    combat(another: Tank) : HitMessage {
         let self = this;
-
-        // this.ownerGame.physics.arcade.collide(this.tankbody, another);
-        this._bullets.forEachAlive((item:Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, another._tankbody, 
-                (bullet: Phaser.Sprite, another: Phaser.Sprite) => Tank.onHit(bullet, another, self._ownerGame));
-        }, this);
-
         another._bullets.forEachAlive((item:Phaser.Sprite) => {
             self._ownerGame.physics.arcade.collide(item, self._tankbody, 
-                (bullet: Phaser.Sprite, another: Phaser.Sprite) => {
-                    Tank.onHit(bullet, another, self._ownerGame);
-                    this._blood -= Math.random() * damage;   
+                (bullet: Phaser.Sprite, notUsed: any) => {
+                    return self.onHit(bullet);
                 });
         }, this);
+
+        this._bullets.forEachAlive((item: Phaser.Sprite) => {
+            self._ownerGame.physics.arcade.collide(item, another, () => { item.kill(); });
+        }, this);
+
+        return undefined;
+    }
+
+    explode() {
+        let self = this;
+        Tank.onExplode(self);
+    }
+
+    hitEffect(x: number, y: number) {
+        let emitter = this._ownerGame.add.emitter(x, y);
+        emitter.makeParticles(particleName, 0, 50, false, false);
+        emitter.explode(300, 50);
     }
 
 // #regions privates.
@@ -261,13 +271,24 @@ class Tank {
         self._bullets.destroy();
     }
 
-    private static onHit(bullet: Phaser.Sprite, another: Phaser.Sprite, game: Phaser.Game) {
+    private onHit(bullet: Phaser.Sprite): HitMessage {
+        this._blood -= Math.random() * damage;
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
-        let emitter = game.add.emitter((bullet.x + another.body.x) / 2, (bullet.y + another.body.y) / 2);
+        let hitX: number = (bullet.x + this._tankbody.body.x) / 2;
+        let hitY: number =  (bullet.y + this._tankbody.body.y) / 2;
+        let emitter = this._ownerGame.add.emitter(hitX, hitY);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
+
+        return {
+            tankId: this.id,
+            hitX: hitX,
+            hitY: hitY,
+            blood: this._blood
+        }
     }
+
 // #endregion
 }
 /// ********************************************************** ///
