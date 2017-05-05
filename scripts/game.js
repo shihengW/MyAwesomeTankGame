@@ -239,6 +239,13 @@ var MovementHelper = (function () {
                 return undefined;
         }
     };
+    MovementHelper.directionToRotation = function (direction) {
+        if (direction == Directions.None) {
+            return undefined;
+        }
+        var angle = MovementHelper.directionToAngle(direction);
+        return Phaser.Math.degToRad(angle);
+    };
     MovementHelper.directionToSpeed = function (direction) {
         if (direction == Directions.None) {
             return { x: 0, y: 0 };
@@ -251,7 +258,18 @@ var MovementHelper = (function () {
             return { x: 0, y: 0 };
         }
         var angleRad = Phaser.Math.degToRad(angle);
-        return { x: Math.sin(angleRad) * tankSpeed, y: 0 - Math.cos(angleRad) * tankSpeed };
+        return { x: Math.sin(angleRad) * MaxVelocity, y: 0 - Math.cos(angleRad) * MaxVelocity };
+    };
+    MovementHelper.stop = function (acceleration, speed) {
+        acceleration.setTo(0, 0);
+        speed.setTo(0, 0);
+    };
+    MovementHelper.angleToAcceleration = function (angle, acceleration, maxVelocity) {
+        var angleRad = Phaser.Math.degToRad(angle);
+        var sinAngle = Math.sin(angleRad);
+        var negCosAngle = 0 - Math.cos(angleRad);
+        acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
+        maxVelocity.setTo(MaxVelocity * sinAngle, MaxVelocity * negCosAngle);
     };
     return MovementHelper;
 }());
@@ -274,13 +292,13 @@ var goneGlobalEventName = "goneGlobal";
 var hitEventName = "hit";
 var hitGlobalEventName = "hitGlobal";
 // Parameters  
-var playerSpeed = 100;
-var fireRate = 300;
-var bulletSpeed = 700;
-var bloodTextOffset = 60;
-var damage = 20;
-var tankSpeed = 300;
-var angleOffsetBase = 0.1 * Math.PI; // degree.
+var FireRate = 300;
+var BulletSpeed = 700;
+var BloodTextOffset = 60;
+var Damage = 20;
+var MaxVelocity = 300;
+var Acceleration = 50;
+var AngleOffsetBase = 0.1 * Math.PI; // degree.
 // TODO: Should use group when figure out how
 var Tank = (function () {
     function Tank(game, id, x, y) {
@@ -294,7 +312,7 @@ var Tank = (function () {
         this._tankbody = game.add.sprite(x, y, tankbodyName);
         this._guntower = game.add.sprite(x, y, guntowerName);
         var style = { font: "20px Arial", fill: "#00A000", align: "center" };
-        this._bloodText = game.add.text(x, y - bloodTextOffset, (this._blood), style);
+        this._bloodText = game.add.text(x, y - BloodTextOffset, (this._blood), style);
         this._tankbody.anchor.set(0.5, 0.5);
         this._guntower.anchor.set(0.5, 0.5);
         this._bloodText.anchor.set(0.5, 0.5);
@@ -302,7 +320,7 @@ var Tank = (function () {
         game.physics.arcade.enable(this._tankbody);
         this._tankbody.body.collideWorldBounds = true;
         this._tankbody.body.bounce.set(0.1, 0.1);
-        this._tankbody.body.mass = 100000;
+        this._tankbody.body.maxVelocity.set(MaxVelocity);
         // Create bullets.
         this._bullets = game.add.group();
         this._bullets.enableBody = true;
@@ -311,6 +329,7 @@ var Tank = (function () {
         this._bullets.setAll("checkWorldBounds", true);
         this._bullets.setAll("outOfBoundsKill", true);
         this._bullets.forEachAlive(function (item) {
+            item.body.bounce.set(0.1, 0.1);
             item.body.mass = 0.1;
         }, this);
     }
@@ -342,13 +361,15 @@ var Tank = (function () {
             return;
         }
         this.direction = d;
-        var newAngle = MovementHelper.directionToAngle(d);
-        var newSpeed = MovementHelper.directionToSpeed(d);
-        if (newAngle != undefined) {
-            this._tankbody.angle = newAngle;
+        if (d == Directions.None) {
+            this._tankbody.body.velocity.set(0, 0);
+            this._tankbody.body.acceleration.set(0, 0);
+            return;
         }
-        this._tankbody.body.velocity.x = newSpeed.x;
-        this._tankbody.body.velocity.y = newSpeed.y;
+        var angle = MovementHelper.directionToAngle(d);
+        this._tankbody.angle = angle;
+        MovementHelper.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        // this._tankbody.body.velocity.set(newSpeed.x, newSpeed.y);
     };
     Tank.prototype.combat = function (another) {
         var self = this;
@@ -378,7 +399,7 @@ var Tank = (function () {
         this._guntower.angle = Phaser.Math.radToDeg(angle) - 90;
         // Second, force to coordinate the guntower, tankbody and blood text
         this._guntower.position = this._tankbody.position;
-        this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + bloodTextOffset);
+        this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + BloodTextOffset);
         this._bloodText.text = this._blood;
     };
     Tank.prototype.shouldFire = function (firingTo) {
@@ -388,7 +409,7 @@ var Tank = (function () {
     Tank.prototype.calculateTrajectory = function () {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
-        var randomAngleOffset = (Math.random() - 0.5) * angleOffsetBase;
+        var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
         var theta = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
         // Set-up constants.
         var halfLength = this._guntower.height / 2;
@@ -410,7 +431,7 @@ var Tank = (function () {
         bullet.anchor.set(0.5, 0.5);
         bullet.reset(startX, startY);
         // bullet.body.angularVelocity = 5000;
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, bulletSpeed);
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
     };
     Tank.prototype.fire = function (firingTo) {
         if (firingTo === void 0) { firingTo = undefined; }
@@ -418,7 +439,7 @@ var Tank = (function () {
             return undefined;
         }
         // Set time.
-        this.nextFireTime = this._ownerGame.time.now + fireRate;
+        this.nextFireTime = this._ownerGame.time.now + FireRate;
         // Calculate the trajectory.
         var trajectory = this.calculateTrajectory();
         if (firingTo != undefined) {
@@ -475,7 +496,7 @@ var Tank = (function () {
         this._tankbody.body.velocity.y = 0;
         this._tankbody.position = position;
         this._guntower.position = position;
-        this._bloodText.position = new Phaser.Point(position.x, position.y + bloodTextOffset);
+        this._bloodText.position = new Phaser.Point(position.x, position.y + BloodTextOffset);
         this._blood = blood;
         this._bloodText.text = blood;
         if (this._blood <= 0) {
@@ -497,7 +518,7 @@ var Tank = (function () {
         self._bullets.destroy();
     };
     Tank.prototype.onHit = function (bullet) {
-        this._blood -= Math.random() * damage;
+        this._blood -= Math.random() * Damage;
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
         var hitX = (bullet.x + this._tankbody.body.x) / 2;

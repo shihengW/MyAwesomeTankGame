@@ -24,7 +24,7 @@ class Tank {
         this._tankbody = game.add.sprite(x, y, tankbodyName);
         this._guntower = game.add.sprite(x, y, guntowerName);
         var style = { font: "20px Arial", fill: "#00A000", align: "center" };
-        this._bloodText = game.add.text(x, y - bloodTextOffset, <string><any>(this._blood), style);
+        this._bloodText = game.add.text(x, y - BloodTextOffset, <string><any>(this._blood), style);
 
         this._tankbody.anchor.set(0.5, 0.5);
         this._guntower.anchor.set(0.5, 0.5);
@@ -34,8 +34,8 @@ class Tank {
         game.physics.arcade.enable(this._tankbody);
         this._tankbody.body.collideWorldBounds = true;
         this._tankbody.body.bounce.set(0.1, 0.1);
-        this._tankbody.body.mass = 100000;
-        
+        this._tankbody.body.maxVelocity.set(MaxVelocity);
+                
         // Create bullets.
         this._bullets = game.add.group();
         this._bullets.enableBody = true;
@@ -77,16 +77,19 @@ class Tank {
         if (this._gameOver) {
             return;
         }
+        
         this.direction = d;
-        let newAngle = MovementHelper.directionToAngle(d);
-        let newSpeed = MovementHelper.directionToSpeed(d);
 
-        if (newAngle != undefined) {
-            this._tankbody.angle = newAngle;
+        if (d == Directions.None) {
+            this._tankbody.body.velocity.set(0, 0);
+            this._tankbody.body.acceleration.set(0, 0);
+            return;
         }
         
-        this._tankbody.body.velocity.x = newSpeed.x;
-        this._tankbody.body.velocity.y = newSpeed.y;
+        let angle = MovementHelper.directionToAngle(d);
+        this._tankbody.angle = angle;
+        MovementHelper.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        // this._tankbody.body.velocity.set(newSpeed.x, newSpeed.y);
     }
 
     combat(another: Tank) : HitMessage {
@@ -125,7 +128,7 @@ class Tank {
         // Second, force to coordinate the guntower, tankbody and blood text
         this._guntower.position = this._tankbody.position;
         this._bloodText.position = new Phaser.Point(this._tankbody.position.x, 
-            this._tankbody.position.y + bloodTextOffset);
+            this._tankbody.position.y + BloodTextOffset);
         this._bloodText.text = <string><any>this._blood;
     }
 
@@ -139,7 +142,7 @@ class Tank {
     private calculateTrajectory(): Trajectory {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
-        const randomAngleOffset: number = (Math.random() - 0.5) * angleOffsetBase;
+        const randomAngleOffset: number = (Math.random() - 0.5) * AngleOffsetBase;
         const theta: number = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
 
         // Set-up constants.
@@ -165,7 +168,7 @@ class Tank {
         bullet.anchor.set(0.5, 0.5);
         bullet.reset(startX, startY);
         // bullet.body.angularVelocity = 5000;
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, bulletSpeed);
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
     }
 
     private fire(firingTo: number = undefined) : number {
@@ -174,7 +177,7 @@ class Tank {
         }
 
         // Set time.
-        this.nextFireTime = this._ownerGame.time.now + fireRate;
+        this.nextFireTime = this._ownerGame.time.now + FireRate;
 
         // Calculate the trajectory.
         let trajectory: Trajectory = this.calculateTrajectory();
@@ -245,7 +248,7 @@ class Tank {
 
         this._tankbody.position = position;
         this._guntower.position = position;
-        this._bloodText.position = new Phaser.Point(position.x, position.y + bloodTextOffset);
+        this._bloodText.position = new Phaser.Point(position.x, position.y + BloodTextOffset);
         
         this._blood = blood;
         this._bloodText.text = <string><any>blood;
@@ -272,7 +275,7 @@ class Tank {
     }
 
     private onHit(bullet: Phaser.Sprite): HitMessage {
-        this._blood -= Math.random() * damage;
+        this._blood -= Math.random() * Damage;
         bullet.kill();
         // Now we are creating the particle emitter, centered to the world
         let hitX: number = (bullet.x + this._tankbody.body.x) / 2;

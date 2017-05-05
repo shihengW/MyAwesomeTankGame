@@ -18,10 +18,10 @@ const hitEventName: string = "hit";
 const hitGlobalEventName: string = "hitGlobal";
 
 // Parameters  
-const playerSpeed: number = 100;
-const fireRate: number = 300;
-const bulletSpeed: number = 700;
-const bloodTextOffset = 60;
-const damage = 20;
-const tankSpeed: number = 300;
-const angleOffsetBase: number = 0.1 * Math.PI; // degree.
+const FireRate: number = 300;
+const BulletSpeed: number = 700;
+const BloodTextOffset = 60;
+const Damage = 20;
+const MaxVelocity: number = 300;
+const Acceleration: number = 50;
+const AngleOffsetBase: number = 0.1 * Math.PI; // degree.

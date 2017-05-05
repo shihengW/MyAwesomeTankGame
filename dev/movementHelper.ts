@@ -62,6 +62,15 @@ class MovementHelper {
         }
     }
 
+    static directionToRotation(direction: Directions): number {
+        if (direction == Directions.None) {
+            return undefined;
+        }
+
+        let angle = MovementHelper.directionToAngle(direction);
+        return Phaser.Math.degToRad(angle);
+    }
+
     static directionToSpeed(direction: Directions) : {x: number, y: number} {
         if (direction == Directions.None) {
             return { x: 0, y: 0 };
@@ -77,7 +86,21 @@ class MovementHelper {
         }
 
         let angleRad = Phaser.Math.degToRad(angle);
-        return { x: Math.sin(angleRad) * tankSpeed, y: 0 - Math.cos(angleRad) * tankSpeed };
+        return { x: Math.sin(angleRad) * MaxVelocity, y: 0 - Math.cos(angleRad) * MaxVelocity };
+    }
+
+    static stop(acceleration: Phaser.Point, speed: Phaser.Point) {
+        acceleration.setTo(0, 0);
+        speed.setTo(0, 0);
+    }
+
+    static angleToAcceleration(angle: number, acceleration: Phaser.Point, maxVelocity: Phaser.Point) {
+        let angleRad = Phaser.Math.degToRad(angle);
+        let sinAngle = Math.sin(angleRad);
+        let negCosAngle = 0 - Math.cos(angleRad);
+
+        acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
+        maxVelocity.setTo(MaxVelocity * sinAngle, MaxVelocity * negCosAngle);
     }
 }
 
