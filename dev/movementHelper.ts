@@ -89,7 +89,7 @@ class MovementHelper {
         return { x: Math.sin(angleRad) * MaxVelocity, y: 0 - Math.cos(angleRad) * MaxVelocity };
     }
 
-    static stop(acceleration: Phaser.Point, speed: Phaser.Point) {
+    static stop(acceleration: Phaser.Point, speed: Phaser.Point) {       
         acceleration.setTo(0, 0);
         speed.setTo(0, 0);
     }
@@ -100,7 +100,7 @@ class MovementHelper {
         let negCosAngle = 0 - Math.cos(angleRad);
 
         acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
-        maxVelocity.setTo(MaxVelocity * sinAngle, MaxVelocity * negCosAngle);
+        maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
     }
 }
 

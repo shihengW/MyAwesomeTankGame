@@ -269,7 +269,7 @@ var MovementHelper = (function () {
         var sinAngle = Math.sin(angleRad);
         var negCosAngle = 0 - Math.cos(angleRad);
         acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
-        maxVelocity.setTo(MaxVelocity * sinAngle, MaxVelocity * negCosAngle);
+        maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
     };
     return MovementHelper;
 }());
@@ -296,8 +296,8 @@ var FireRate = 300;
 var BulletSpeed = 700;
 var BloodTextOffset = 60;
 var Damage = 20;
-var MaxVelocity = 300;
-var Acceleration = 50;
+var MaxVelocity = 500;
+var Acceleration = 300;
 var AngleOffsetBase = 0.1 * Math.PI; // degree.
 // TODO: Should use group when figure out how
 var Tank = (function () {
