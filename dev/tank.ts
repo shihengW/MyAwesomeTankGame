@@ -49,6 +49,10 @@ class Tank {
             item.body.mass = 0.1; }, this);
     }
 
+    getBody() : Phaser.Sprite {
+        return this._tankbody;
+    }
+
     update(shouldFire): Message {
         // If game over, do nothing.
         if (this._gameOver) { return this.getJson(undefined); }
@@ -86,10 +90,9 @@ class Tank {
             return;
         }
         
-        let angle = MovementHelper.directionToAngle(d);
+        let angle = MovementHelpers.directionToAngle(d);
         this._tankbody.angle = angle;
-        MovementHelper.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
-        // this._tankbody.body.velocity.set(newSpeed.x, newSpeed.y);
+        MovementHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
     }
 
     combat(another: Tank) : HitMessage {
@@ -122,8 +125,8 @@ class Tank {
 // #regions privates.
     private syncPosition() {
         // First, move gun tower to point to mouse.
-        const angle: number = Phaser.Math.angleBetweenPoints(this._ownerGame.input.activePointer.position, this._tankbody.body.position);
-        this._guntower.angle = Phaser.Math.radToDeg(angle) - 90;
+        const angle: number = this._ownerGame.physics.arcade.angleToPointer(this._guntower);
+        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90;
 
         // Second, force to coordinate the guntower, tankbody and blood text
         this._guntower.position = this._tankbody.position;
@@ -188,16 +191,8 @@ class Tank {
         
         // Fire.
         this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
-        
-        // Just move the guntower a little bit to simulate the Newton's second law.
-        let Newton = true;
-        if (Newton) {
-            let xguntowerOffset: number = -1 * trajectory.sinTheta * 5;
-            let yguntowerOffset: number = -1 * trajectory.reverseCosTheta * 5;
-            this._ownerGame.add.tween(this._guntower).to( 
-                { x: this._tankbody.position.x + xguntowerOffset, y: this._tankbody.position.y + yguntowerOffset }, 
-                30, Phaser.Easing.Linear.None, true, 0, 0, true);
-        }
+        // Let's shake it shake it.
+        this._ownerGame.camera.shake(0.005, 50);
         return trajectory.theta;
     }
 

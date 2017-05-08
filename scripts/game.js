@@ -10,6 +10,36 @@ var Directions;
     Directions[Directions["DownLeft"] = 12] = "DownLeft";
     Directions[Directions["DownRight"] = 20] = "DownRight";
 })(Directions || (Directions = {}));
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
+var DrawHelpers = (function () {
+    function DrawHelpers() {
+    }
+    DrawHelpers.drawGrids = function (graphics, width, height) {
+        var hnum = Math.floor(width / GridWidth);
+        var vnum = Math.floor(height / GridHeight);
+        // Draw vertical lines.
+        graphics.beginFill(0xA03F00);
+        graphics.lineStyle(1, 0xA03F00, 1);
+        // draw a shape
+        for (var i = 1; i < hnum; i++) {
+            var x = i * GridWidth;
+            graphics.moveTo(x, 0);
+            graphics.lineTo(x, height - 1);
+        }
+        graphics.endFill();
+        // Draw horizontal lines.
+        graphics.beginFill(0x00A000);
+        graphics.lineStyle(1, 0x00A000, 1);
+        // draw a shape
+        for (var i = 1; i < vnum; i++) {
+            var y = i * GridHeight;
+            graphics.moveTo(0, y);
+            graphics.lineTo(width - 1, y);
+        }
+        graphics.endFill();
+    };
+    return DrawHelpers;
+}());
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
@@ -31,16 +61,22 @@ var TheGame = (function () {
     TheGame.prototype.create = function () {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
+        // Set-up world and bg.
+        this.game.world.setBounds(0, 0, GameWidth, GameHeight);
+        var graphics = this.game.add.graphics(0, 0);
+        DrawHelpers.drawGrids(graphics, GameWidth, GameHeight);
         // Set-up inputs.
         for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D]; _i < _a.length; _i++) {
             var key = _a[_i];
             TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
         }
         // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
-        var x = Math.floor(this.game.width * Math.random());
-        var y = Math.floor(this.game.height * Math.random());
+        var x = Math.floor(GameWidth * Math.random());
+        var y = Math.floor(GameHeight * Math.random());
         var id = Math.ceil(Math.random() * 1000);
         this._player = new Tank(this.game, id, x, y);
+        this.game.camera.follow(this._player.getBody());
+        this.game.camera.deadzone = new Phaser.Rectangle(350, 300, this.game.width - 700, this.game.height - 600);
         // Create socket, register events and tell the server
         this._socket = io();
         var self = this;
@@ -91,11 +127,11 @@ var TheGame = (function () {
     // #region: privates.
     TheGame.prototype.onKeyDown = function (e) {
         var addDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelper.addDirectionIntegral(this._player, addDirection);
+        MovementHelpers.addDirectionIntegral(this._player, addDirection);
     };
     TheGame.prototype.onKeyUp = function (e) {
         var removeDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelper.removeDirectionIntegral(this._player, removeDirection);
+        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
     };
     TheGame.removeEnemyByJson = function (self, enemy) {
         // TODO: Refactor these ugly logic.
@@ -161,20 +197,6 @@ var TheGame = (function () {
         }
         return direction;
     };
-    TheGame.createSandbagAndMakeItMove = function (game) {
-        var sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
-        // Setup
-        game.physics.arcade.enable(sandbag);
-        sandbag.body.collideWorldBounds = true;
-        sandbag.body.bounce.x = 1;
-        sandbag.body.bounce.y = 1;
-        sandbag.body.mass = 100;
-        sandbag.anchor.set(0.5, 0.5);
-        // Make it run.
-        // TODO: Should find a way to make it run randomly.
-        game.physics.arcade.accelerateToXY(sandbag, game.width / 2, game.height / 2 - 50, 100);
-        return sandbag;
-    };
     return TheGame;
 }());
 /// *** Game main class *** ///
@@ -183,32 +205,32 @@ window.onload = function () {
 };
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // TODO: Finish these logic when you have time.
-var MovementHelper = (function () {
-    function MovementHelper() {
+var MovementHelpers = (function () {
+    function MovementHelpers() {
     }
-    MovementHelper.addDirectionIntegral = function (tank, addDirection) {
-        var newDirection = MovementHelper.addDirection(tank.direction, addDirection);
+    MovementHelpers.addDirectionIntegral = function (tank, addDirection) {
+        var newDirection = MovementHelpers.addDirection(tank.direction, addDirection);
         tank.drive(newDirection);
     };
-    MovementHelper.removeDirectionIntegral = function (tank, removeDirection) {
-        var newDirection = MovementHelper.removeDirection(tank.direction, removeDirection);
+    MovementHelpers.removeDirectionIntegral = function (tank, removeDirection) {
+        var newDirection = MovementHelpers.removeDirection(tank.direction, removeDirection);
         tank.drive(newDirection);
     };
-    MovementHelper.addDirection = function (direction, addDirection) {
+    MovementHelpers.addDirection = function (direction, addDirection) {
         // If direction alread has the added direction, just return. This case may barely happen.
         if ((direction & addDirection) != 0) {
             return Directions.None;
         }
-        var opsiteDirection = MovementHelper.getOpsiteDirection(addDirection);
+        var opsiteDirection = MovementHelpers.getOpsiteDirection(addDirection);
         if ((direction & opsiteDirection) != 0) {
             return direction = direction & (~opsiteDirection);
         }
         return direction | addDirection;
     };
-    MovementHelper.removeDirection = function (direction, removeDirection) {
+    MovementHelpers.removeDirection = function (direction, removeDirection) {
         return direction & (~removeDirection);
     };
-    MovementHelper.getOpsiteDirection = function (direction) {
+    MovementHelpers.getOpsiteDirection = function (direction) {
         switch (direction) {
             case Directions.Up: return Directions.Down;
             case Directions.Down: return Directions.Up;
@@ -217,7 +239,7 @@ var MovementHelper = (function () {
         }
         return Directions.None;
     };
-    MovementHelper.directionToAngle = function (direction) {
+    MovementHelpers.directionToAngle = function (direction) {
         switch (direction) {
             case Directions.Up:
                 return 0;
@@ -239,39 +261,39 @@ var MovementHelper = (function () {
                 return undefined;
         }
     };
-    MovementHelper.directionToRotation = function (direction) {
+    MovementHelpers.directionToRotation = function (direction) {
         if (direction == Directions.None) {
             return undefined;
         }
-        var angle = MovementHelper.directionToAngle(direction);
+        var angle = MovementHelpers.directionToAngle(direction);
         return Phaser.Math.degToRad(angle);
     };
-    MovementHelper.directionToSpeed = function (direction) {
+    MovementHelpers.directionToSpeed = function (direction) {
         if (direction == Directions.None) {
             return { x: 0, y: 0 };
         }
-        var angle = MovementHelper.directionToAngle(direction);
-        return MovementHelper.angleToSpeed(angle);
+        var angle = MovementHelpers.directionToAngle(direction);
+        return MovementHelpers.angleToSpeed(angle);
     };
-    MovementHelper.angleToSpeed = function (angle) {
+    MovementHelpers.angleToSpeed = function (angle) {
         if (angle == undefined) {
             return { x: 0, y: 0 };
         }
         var angleRad = Phaser.Math.degToRad(angle);
         return { x: Math.sin(angleRad) * MaxVelocity, y: 0 - Math.cos(angleRad) * MaxVelocity };
     };
-    MovementHelper.stop = function (acceleration, speed) {
+    MovementHelpers.stop = function (acceleration, speed) {
         acceleration.setTo(0, 0);
         speed.setTo(0, 0);
     };
-    MovementHelper.angleToAcceleration = function (angle, acceleration, maxVelocity) {
+    MovementHelpers.angleToAcceleration = function (angle, acceleration, maxVelocity) {
         var angleRad = Phaser.Math.degToRad(angle);
         var sinAngle = Math.sin(angleRad);
         var negCosAngle = 0 - Math.cos(angleRad);
         acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
         maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
     };
-    return MovementHelper;
+    return MovementHelpers;
 }());
 /// ********************************************************** /// 
 /// ****** names and parameters. ****** ///
@@ -299,6 +321,11 @@ var Damage = 20;
 var MaxVelocity = 500;
 var Acceleration = 300;
 var AngleOffsetBase = 0.1 * Math.PI; // degree.
+// background
+var GridHeight = 80;
+var GridWidth = 60;
+var GameHeight = 5000;
+var GameWidth = 5000;
 // TODO: Should use group when figure out how
 var Tank = (function () {
     function Tank(game, id, x, y) {
@@ -333,6 +360,9 @@ var Tank = (function () {
             item.body.mass = 0.1;
         }, this);
     }
+    Tank.prototype.getBody = function () {
+        return this._tankbody;
+    };
     Tank.prototype.update = function (shouldFire) {
         // If game over, do nothing.
         if (this._gameOver) {
@@ -366,10 +396,9 @@ var Tank = (function () {
             this._tankbody.body.acceleration.set(0, 0);
             return;
         }
-        var angle = MovementHelper.directionToAngle(d);
+        var angle = MovementHelpers.directionToAngle(d);
         this._tankbody.angle = angle;
-        MovementHelper.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
-        // this._tankbody.body.velocity.set(newSpeed.x, newSpeed.y);
+        MovementHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
     };
     Tank.prototype.combat = function (another) {
         var self = this;
@@ -395,8 +424,8 @@ var Tank = (function () {
     // #regions privates.
     Tank.prototype.syncPosition = function () {
         // First, move gun tower to point to mouse.
-        var angle = Phaser.Math.angleBetweenPoints(this._ownerGame.input.activePointer.position, this._tankbody.body.position);
-        this._guntower.angle = Phaser.Math.radToDeg(angle) - 90;
+        var angle = this._ownerGame.physics.arcade.angleToPointer(this._guntower);
+        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90;
         // Second, force to coordinate the guntower, tankbody and blood text
         this._guntower.position = this._tankbody.position;
         this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + BloodTextOffset);
@@ -447,13 +476,8 @@ var Tank = (function () {
         }
         // Fire.
         this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
-        // Just move the guntower a little bit to simulate the Newton's second law.
-        var Newton = true;
-        if (Newton) {
-            var xguntowerOffset = -1 * trajectory.sinTheta * 5;
-            var yguntowerOffset = -1 * trajectory.reverseCosTheta * 5;
-            this._ownerGame.add.tween(this._guntower).to({ x: this._tankbody.position.x + xguntowerOffset, y: this._tankbody.position.y + yguntowerOffset }, 30, Phaser.Easing.Linear.None, true, 0, 0, true);
-        }
+        // Let's shake it shake it.
+        this._ownerGame.camera.shake(0.005, 50);
         return trajectory.theta;
     };
     Tank.prototype.getJson = function (firingTo) {

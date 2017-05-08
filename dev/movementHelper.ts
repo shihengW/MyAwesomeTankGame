@@ -1,13 +1,13 @@
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // TODO: Finish these logic when you have time.
-class MovementHelper {
+class MovementHelpers {
     static addDirectionIntegral(tank: Tank, addDirection: Directions) {
-        let newDirection: Directions = MovementHelper.addDirection(tank.direction, addDirection);
+        let newDirection: Directions = MovementHelpers.addDirection(tank.direction, addDirection);
         tank.drive(newDirection);
     }
 
     static removeDirectionIntegral(tank: Tank, removeDirection: Directions) {
-        let newDirection: Directions = MovementHelper.removeDirection(tank.direction, removeDirection);
+        let newDirection: Directions = MovementHelpers.removeDirection(tank.direction, removeDirection);
         tank.drive(newDirection);
     }
 
@@ -17,7 +17,7 @@ class MovementHelper {
             return Directions.None;
         }
 
-        let opsiteDirection = MovementHelper.getOpsiteDirection(addDirection);
+        let opsiteDirection = MovementHelpers.getOpsiteDirection(addDirection);
         if ((direction & opsiteDirection) != 0) {
             return direction = direction & (~opsiteDirection);
         }
@@ -67,7 +67,7 @@ class MovementHelper {
             return undefined;
         }
 
-        let angle = MovementHelper.directionToAngle(direction);
+        let angle = MovementHelpers.directionToAngle(direction);
         return Phaser.Math.degToRad(angle);
     }
 
@@ -76,8 +76,8 @@ class MovementHelper {
             return { x: 0, y: 0 };
         }
 
-        let angle: number = MovementHelper.directionToAngle(direction);
-        return MovementHelper.angleToSpeed(angle);
+        let angle: number = MovementHelpers.directionToAngle(direction);
+        return MovementHelpers.angleToSpeed(angle);
     }
 
     static angleToSpeed(angle: number) : {x: number, y: number} {

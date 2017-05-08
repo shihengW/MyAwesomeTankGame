@@ -31,17 +31,24 @@ class TheGame {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
 
+        // Set-up world and bg.
+        this.game.world.setBounds(0, 0, GameWidth, GameHeight);
+        let graphics = this.game.add.graphics(0, 0);
+        DrawHelpers.drawGrids(graphics, GameWidth, GameHeight);
+
         // Set-up inputs.
         for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D ]) {
             TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
         }
 
         // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
-        let x = Math.floor(this.game.width * Math.random());
-        let y = Math.floor(this.game.height * Math.random());
+        let x = Math.floor(GameWidth * Math.random());
+        let y = Math.floor(GameHeight * Math.random());
         let id = Math.ceil(Math.random() * 1000);
         this._player = new Tank(this.game, id, x, y);
-        
+        this.game.camera.follow(this._player.getBody());
+        this.game.camera.deadzone = new Phaser.Rectangle(350, 300, this.game.width - 700, this.game.height - 600);
+    
         // Create socket, register events and tell the server
         this._socket = io();
         let self = this;
@@ -98,12 +105,12 @@ class TheGame {
 // #region: privates.
     private onKeyDown(e: Phaser.Key) {
         let addDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelper.addDirectionIntegral(this._player, addDirection);
+        MovementHelpers.addDirectionIntegral(this._player, addDirection);
     }
 
     private onKeyUp(e: Phaser.Key) {
         let removeDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelper.removeDirectionIntegral(this._player, removeDirection);
+        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
     }
     
     private static removeEnemyByJson(self: TheGame, enemy: IdMessage): Tank {
@@ -163,23 +170,6 @@ class TheGame {
             case "d": direction = Directions.Right; break;
         }
         return direction;
-    }
-
-    private static createSandbagAndMakeItMove(game: Phaser.Game) : Phaser.Sprite {
-        let sandbag = game.add.sprite(game.width, game.height / 2 - 50, sandbagName);
-
-        // Setup
-        game.physics.arcade.enable(sandbag);
-        sandbag.body.collideWorldBounds = true;
-        sandbag.body.bounce.x = 1;
-        sandbag.body.bounce.y = 1;
-        sandbag.body.mass = 100;
-        sandbag.anchor.set(0.5, 0.5);
-
-        // Make it run.
-        // TODO: Should find a way to make it run randomly.
-        game.physics.arcade.accelerateToXY(sandbag, game.width / 2, game.height / 2 - 50, 100);
-        return sandbag;
     }
 // #endregion
 }

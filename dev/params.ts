@@ -25,3 +25,9 @@ const Damage = 20;
 const MaxVelocity: number = 500;
 const Acceleration: number = 300;
 const AngleOffsetBase: number = 0.1 * Math.PI; // degree.
+
+// background
+const GridHeight = 80;
+const GridWidth = 60;
+const GameHeight = 5000;
+const GameWidth = 5000;
