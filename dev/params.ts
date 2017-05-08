@@ -27,7 +27,7 @@ const Acceleration: number = 300;
 const AngleOffsetBase: number = 0.1 * Math.PI; // degree.
 
 // background
-const GridHeight = 80;
-const GridWidth = 60;
+const GridHeight = 50;
+const GridWidth = 90;
 const GameHeight = 5000;
 const GameWidth = 5000;

@@ -17,26 +17,18 @@ var DrawHelpers = (function () {
     DrawHelpers.drawGrids = function (graphics, width, height) {
         var hnum = Math.floor(width / GridWidth);
         var vnum = Math.floor(height / GridHeight);
-        // Draw vertical lines.
-        graphics.beginFill(0xA03F00);
-        graphics.lineStyle(1, 0xA03F00, 1);
-        // draw a shape
-        for (var i = 1; i < hnum; i++) {
+        graphics.lineStyle(2, 0xE03F00, 1);
+        for (var i = 2; i < hnum - 2; i++) {
             var x = i * GridWidth;
             graphics.moveTo(x, 0);
-            graphics.lineTo(x, height - 1);
+            graphics.lineTo(x, height);
         }
-        graphics.endFill();
-        // Draw horizontal lines.
-        graphics.beginFill(0x00A000);
-        graphics.lineStyle(1, 0x00A000, 1);
-        // draw a shape
-        for (var i = 1; i < vnum; i++) {
+        graphics.lineStyle(2, 0x00E05E, 1);
+        for (var i = 2; i < vnum - 2; i++) {
             var y = i * GridHeight;
             graphics.moveTo(0, y);
-            graphics.lineTo(width - 1, y);
+            graphics.lineTo(width, y);
         }
-        graphics.endFill();
     };
     return DrawHelpers;
 }());
@@ -45,7 +37,7 @@ var DrawHelpers = (function () {
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var TheGame = (function () {
     function TheGame() {
-        this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
+        this.game = new Phaser.Game(window.innerWidth * window.devicePixelRatio, window.innerHeight * window.devicePixelRatio, Phaser.CANVAS, 'content', {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
@@ -76,7 +68,9 @@ var TheGame = (function () {
         var id = Math.ceil(Math.random() * 1000);
         this._player = new Tank(this.game, id, x, y);
         this.game.camera.follow(this._player.getBody());
-        this.game.camera.deadzone = new Phaser.Rectangle(350, 300, this.game.width - 700, this.game.height - 600);
+        var deadzoneOffsetX = Math.abs(Math.floor(this.game.width / 2.3));
+        var deadzoneOffsetY = Math.abs(Math.floor(this.game.height / 2.3));
+        this.game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, this.game.width - deadzoneOffsetX * 2, this.game.height - deadzoneOffsetY * 2);
         // Create socket, register events and tell the server
         this._socket = io();
         var self = this;
@@ -322,8 +316,8 @@ var MaxVelocity = 500;
 var Acceleration = 300;
 var AngleOffsetBase = 0.1 * Math.PI; // degree.
 // background
-var GridHeight = 80;
-var GridWidth = 60;
+var GridHeight = 50;
+var GridWidth = 90;
 var GameHeight = 5000;
 var GameWidth = 5000;
 // TODO: Should use group when figure out how
@@ -352,7 +346,7 @@ var Tank = (function () {
         this._bullets = game.add.group();
         this._bullets.enableBody = true;
         this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this._bullets.createMultiple(5, bulletName);
+        this._bullets.createMultiple(50, bulletName);
         this._bullets.setAll("checkWorldBounds", true);
         this._bullets.setAll("outOfBoundsKill", true);
         this._bullets.forEachAlive(function (item) {

@@ -12,7 +12,8 @@ class TheGame {
     private _socket: any;
 
     constructor() {
-        this.game = new Phaser.Game(1200, 750, Phaser.AUTO, 'content', {
+        this.game = new Phaser.Game(window.innerWidth * window.devicePixelRatio, 
+            window.innerHeight * window.devicePixelRatio, Phaser.CANVAS, 'content', {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
@@ -47,7 +48,10 @@ class TheGame {
         let id = Math.ceil(Math.random() * 1000);
         this._player = new Tank(this.game, id, x, y);
         this.game.camera.follow(this._player.getBody());
-        this.game.camera.deadzone = new Phaser.Rectangle(350, 300, this.game.width - 700, this.game.height - 600);
+        let deadzoneOffsetX = Math.abs(Math.floor(this.game.width / 2.3));
+        let deadzoneOffsetY = Math.abs(Math.floor(this.game.height / 2.3));
+        this.game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, 
+                this.game.width - deadzoneOffsetX * 2, this.game.height - deadzoneOffsetY * 2);
     
         // Create socket, register events and tell the server
         this._socket = io();

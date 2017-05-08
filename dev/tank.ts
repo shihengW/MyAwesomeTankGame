@@ -40,7 +40,7 @@ class Tank {
         this._bullets = game.add.group();
         this._bullets.enableBody = true;
         this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this._bullets.createMultiple(5, bulletName);
+        this._bullets.createMultiple(50, bulletName);
 
         this._bullets.setAll("checkWorldBounds", true);
         this._bullets.setAll("outOfBoundsKill", true);
