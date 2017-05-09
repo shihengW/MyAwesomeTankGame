@@ -23,35 +23,100 @@ class DrawHelpers {
 class MiniMap {
     private _bounds: Phaser.Point = new Phaser.Point(100, 80);
     private _offsets: Phaser.Point = new Phaser.Point(10, 10);
-    private _graphics: Phaser.Graphics;
-    private _showMap: boolean = false;
+    private _graphicsOuter: Phaser.Graphics;
+    private _graphicsPlayer: Phaser.Graphics;
     private _player: Tank;
     private _game: Phaser.Game;
+    private _show: boolean = false;
 
     constructor(game: Phaser.Game, player: Tank) {
-        this._graphics = game.add.graphics(0, 0);
+        this._graphicsOuter = game.add.graphics(this._offsets.x, this._offsets.y);
+        this._graphicsPlayer = game.add.graphics(this._offsets.x, this._offsets.y);
         // This should not be affected by camera.
-        this._graphics.fixedToCamera = true;
+        this._graphicsOuter.fixedToCamera = true;
+        this._graphicsPlayer.fixedToCamera = true;
         this._player = player;
         this._game = game;
     }
 
     public updateMap(show: boolean) {
-        this._graphics.clear();
+        this._graphicsPlayer.clear();
         if (show) {
-            this._showMap = true;
-            this._graphics.lineStyle(10, 0xE03F00, 0.5);
-            this._graphics.drawRect(this._offsets.x, this._offsets.y, this._bounds.x, this._bounds.y);
+            if (!this._show) {
+                this._show = true;
+                this._graphicsOuter.beginFill(0xFF3300, 0.3);
+                this._graphicsOuter.lineStyle(1, 0xFF3300, 0.3);
+                this._graphicsOuter.drawRect(this._offsets.x, this._offsets.y, this._bounds.x, this._bounds.y);
+                this._graphicsOuter.endFill();
+            }
 
             let spot = this.getPlayer();
-            this._graphics.lineStyle(4, 0x00AF00, 0.8);
-            this._graphics.drawRect(spot.x, spot.y, 4, 4);
+            this._graphicsPlayer.lineStyle(4, 0x00AF00, 0.8);
+            this._graphicsPlayer.drawRect(spot.x, spot.y, 4, 4);
+        }
+        else {
+            this._show = false;
+            this._graphicsOuter.clear();
         }
     }
 
     private getPlayer() : Phaser.Point {
-        let x: number = (this._player.getBody()).position.x / GameWidth * this._bounds.x + this._offsets.x;
-        let y: number = (this._player.getBody()).position.y / GameHeight * this._bounds.y + this._offsets.y;
+        let x: number = (this._player.getBody()).position.x / GameWidth * this._bounds.x + 10;
+        let y: number = (this._player.getBody()).position.y / GameHeight * this._bounds.y + 10;
         return new Phaser.Point(x, y);
     }    
+}
+
+class Joystick {
+
+    private _game: Phaser.Game;
+    private _r: number = 100;
+    private _center: Phaser.Point;
+    private _graphics: Phaser.Graphics;
+    private _offset: number = 20;
+    private _radMin: number = Math.PI * 0.25;
+
+    constructor(game: Phaser.Game) {
+        this._game = game;
+        this._graphics = game.add.graphics(0, 0);
+        this._graphics.fixedToCamera = true;
+        this._center = new Phaser.Point(this._r + this._offset, this._game.camera.height - this._r - this._offset);
+    }
+
+    public drawJoystick() {
+        this._graphics.lineStyle(20, 0x00AF00, 0.8);
+        this._graphics.drawCircle(this._center.x, this._center.y, this._r);
+    }
+
+    public getDirection(point: Phaser.Point) : Directions {
+        if (Phaser.Math.distance(point.x, point.y, this._center.x, this._center.y) > (this._r + this._offset)) {
+            return undefined;
+        }
+        let rad = Phaser.Math.angleBetweenPoints(this._center, point);
+        if (rad > -0.5 * this._radMin && rad < 0.5 * this._radMin) {
+            return Directions.Right;
+        }
+        if (rad > 0.5 * this._radMin && rad < this._radMin) {
+            return Directions.DownRight;
+        }
+        if (rad > this._radMin && rad < 1.5 * this._radMin) {
+            return Directions.Down;
+        }
+        if (rad > 1.5 * this._radMin && rad < 2 * this._radMin) {
+            return Directions.DownLeft;
+        }
+        if (rad > 2 * this._radMin || rad < -2 * this._radMin) {
+            return Directions.Left;
+        }
+        if (rad < -0.5 * this._radMin && rad > -1 * this._radMin) {
+            return Directions.UpRight;
+        }
+        if (rad < -1 * this._radMin && rad > -1.5 * this._radMin) {
+            return Directions.Up;
+        }
+        if (rad < -1.5 * this._radMin && rad > -2 * this._radMin) {
+            return Directions.UpLeft;
+        }
+        return Directions.None;
+    }
 }

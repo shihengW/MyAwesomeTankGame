@@ -36,30 +36,62 @@ var MiniMap = (function () {
     function MiniMap(game, player) {
         this._bounds = new Phaser.Point(100, 80);
         this._offsets = new Phaser.Point(10, 10);
-        this._showMap = false;
-        this._graphics = game.add.graphics(0, 0);
+        this._show = false;
+        this._graphicsOuter = game.add.graphics(this._offsets.x, this._offsets.y);
+        this._graphicsPlayer = game.add.graphics(this._offsets.x, this._offsets.y);
         // This should not be affected by camera.
-        this._graphics.fixedToCamera = true;
+        this._graphicsOuter.fixedToCamera = true;
+        this._graphicsPlayer.fixedToCamera = true;
         this._player = player;
         this._game = game;
     }
     MiniMap.prototype.updateMap = function (show) {
-        this._graphics.clear();
+        this._graphicsPlayer.clear();
         if (show) {
-            this._showMap = true;
-            this._graphics.lineStyle(10, 0xE03F00, 0.5);
-            this._graphics.drawRect(this._offsets.x, this._offsets.y, this._bounds.x, this._bounds.y);
+            if (!this._show) {
+                this._show = true;
+                this._graphicsOuter.beginFill(0xFF3300, 0.3);
+                this._graphicsOuter.lineStyle(1, 0xFF3300, 0.3);
+                this._graphicsOuter.drawRect(this._offsets.x, this._offsets.y, this._bounds.x, this._bounds.y);
+                this._graphicsOuter.endFill();
+            }
             var spot = this.getPlayer();
-            this._graphics.lineStyle(4, 0x00AF00, 0.8);
-            this._graphics.drawRect(spot.x, spot.y, 4, 4);
+            this._graphicsPlayer.lineStyle(4, 0x00AF00, 0.8);
+            this._graphicsPlayer.drawRect(spot.x, spot.y, 4, 4);
+        }
+        else {
+            this._show = false;
+            this._graphicsOuter.clear();
         }
     };
     MiniMap.prototype.getPlayer = function () {
-        var x = (this._player.getBody()).position.x / GameWidth * this._bounds.x + this._offsets.x;
-        var y = (this._player.getBody()).position.y / GameHeight * this._bounds.y + this._offsets.y;
+        var x = (this._player.getBody()).position.x / GameWidth * this._bounds.x + 10;
+        var y = (this._player.getBody()).position.y / GameHeight * this._bounds.y + 10;
         return new Phaser.Point(x, y);
     };
     return MiniMap;
+}());
+var Joystick = (function () {
+    function Joystick(game) {
+        this._r = 100;
+        this._offset = 20;
+        this._game = game;
+        this._graphics = game.add.graphics(0, 0);
+        this._graphics.fixedToCamera = true;
+        this._center = new Phaser.Point(this._r + this._offset, this._game.camera.height - this._r - this._offset);
+    }
+    Joystick.prototype.drawJoystick = function () {
+        this._graphics.lineStyle(20, 0x00AF00, 0.8);
+        this._graphics.drawCircle(this._center.x, this._center.y, this._r);
+    };
+    Joystick.prototype.getDirection = function (point) {
+        if (Phaser.Math.distance(point.x, point.y, this._center.x, this._center.y) > (this._r + this._offset)) {
+            return undefined;
+        }
+        var rad = Phaser.Math.angleBetweenPoints(this._center, point);
+        return Directions.None;
+    };
+    return Joystick;
 }());
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
@@ -133,6 +165,8 @@ var TheGame = (function () {
             gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
         // mini map.
         this._miniMap = new MiniMap(this.game, this._player);
+        this._joystick = new Joystick(this.game);
+        this._joystick.drawJoystick();
     };
     TheGame.prototype.update = function () {
         var _this = this;
@@ -149,6 +183,9 @@ var TheGame = (function () {
             });
         }
         this._miniMap.updateMap(this._player.direction != Directions.None);
+        if (this.game.input.activePointer.isDown) {
+            this._joystick.getDirection(this.game.input.activePointer.position);
+        }
     };
     // #region: privates.
     TheGame.prototype.onKeyDown = function (e) {

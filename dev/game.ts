@@ -11,6 +11,7 @@ class TheGame {
     private _enemies: Tank[];
     private _socket: any;
     private _miniMap: MiniMap;
+    private _joystick: Joystick;
 
     constructor() {
         this.game = new Phaser.Game(window.innerWidth * window.devicePixelRatio, 
@@ -92,6 +93,8 @@ class TheGame {
 
         // mini map.
         this._miniMap = new MiniMap(this.game, this._player);
+        this._joystick = new Joystick(this.game);
+        this._joystick.drawJoystick();
     }
 
     update() {
