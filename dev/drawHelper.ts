@@ -70,10 +70,10 @@ class MiniMap {
 class Joystick {
 
     private _game: Phaser.Game;
-    private _r: number = 100;
+    private _r: number = 200;
     private _center: Phaser.Point;
     private _graphics: Phaser.Graphics;
-    private _offset: number = 20;
+    private _offset: number = 0;
     private _radMin: number = Math.PI * 0.25;
 
     constructor(game: Phaser.Game) {
@@ -88,7 +88,37 @@ class Joystick {
         this._graphics.drawCircle(this._center.x, this._center.y, this._r);
     }
 
-    public getDirection(point: Phaser.Point) : Directions {
+    public checkPointer() : { fire: boolean, drive: boolean, direction: Directions } {
+        let fire = false;
+        let drive = false;
+        let direction = Directions.None;
+
+        if (this._game.input.pointer1.isDown) {
+            let d = this.getDirection(this._game.input.pointer1.position);
+            if (d == undefined) {
+                fire = true;
+            }
+            else {
+                drive = true;
+                direction = d;
+            }
+        }
+
+        if (this._game.input.pointer2.isDown) {
+            let d = this.getDirection(this._game.input.pointer2.position);
+            if (d == undefined) {
+                fire = true;
+            }
+            else {
+                drive = true;
+                direction = d;
+            }
+        }
+
+        return { fire: fire, drive: drive, direction: direction };
+    }
+
+    private getDirection(point: Phaser.Point) : Directions {
         if (Phaser.Math.distance(point.x, point.y, this._center.x, this._center.y) > (this._r + this._offset)) {
             return undefined;
         }

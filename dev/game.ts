@@ -14,11 +14,15 @@ class TheGame {
     private _joystick: Joystick;
 
     constructor() {
-        this.game = new Phaser.Game(window.innerWidth * window.devicePixelRatio, 
-            window.innerHeight * window.devicePixelRatio, Phaser.CANVAS, 'content', {
-            create: this.create, preload: this.preload, update: this.update
-            // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
+        this.game = new Phaser.Game(
+            window.screen.availWidth * window.devicePixelRatio, 
+            window.screen.availHeight * window.devicePixelRatio, 
+            Phaser.CANVAS, 'content', { 
+                create: this.create, preload: this.preload, update: this.update
+                // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
+
+        // this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.EXACT_FIT;
     }
 
     preload() {
@@ -93,15 +97,27 @@ class TheGame {
 
         // mini map.
         this._miniMap = new MiniMap(this.game, this._player);
-        this._joystick = new Joystick(this.game);
-        this._joystick.drawJoystick();
+        if (isMobile.any()) {
+            this._joystick = new Joystick(this.game);
+            this._joystick.drawJoystick();
+        }
     }
 
     update() {
+        let message: any = undefined;
         // First, update tank itself.
-        let message = this._player.update(this.game.input.activePointer.isDown);
+        if (this._joystick != undefined) {
+            let result = this._joystick.checkPointer();
+            if (this._player.direction != result.direction) {
+                this._player.drive(result.direction);
+            }
+            message = this._player.update(result.fire);
+        }
+        else {
+            message = this._player.update(this.game.input.activePointer.isDown);
+        }
         this._socket.emit(tankUpdateEventName, message);
-
+        
         // Then, check collision.
         if (this._enemies != undefined) {
             this._enemies.forEach(enemy => {

@@ -1,4 +1,4 @@
 /// *** Game main class *** ///
 window.onload = () => {
-    var game = new TheGame();
+        var game = new TheGame();
 };

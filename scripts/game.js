@@ -73,8 +73,9 @@ var MiniMap = (function () {
 }());
 var Joystick = (function () {
     function Joystick(game) {
-        this._r = 100;
-        this._offset = 20;
+        this._r = 200;
+        this._offset = 0;
+        this._radMin = Math.PI * 0.25;
         this._game = game;
         this._graphics = game.add.graphics(0, 0);
         this._graphics.fixedToCamera = true;
@@ -84,11 +85,61 @@ var Joystick = (function () {
         this._graphics.lineStyle(20, 0x00AF00, 0.8);
         this._graphics.drawCircle(this._center.x, this._center.y, this._r);
     };
+    Joystick.prototype.checkPointer = function () {
+        var fire = false;
+        var drive = false;
+        var direction = Directions.None;
+        if (this._game.input.pointer1.isDown) {
+            var d = this.getDirection(this._game.input.pointer1.position);
+            if (d == undefined) {
+                fire = true;
+            }
+            else {
+                drive = true;
+                direction = d;
+            }
+        }
+        if (this._game.input.pointer2.isDown) {
+            var d = this.getDirection(this._game.input.pointer2.position);
+            if (d == undefined) {
+                fire = true;
+            }
+            else {
+                drive = true;
+                direction = d;
+            }
+        }
+        return { fire: fire, drive: drive, direction: direction };
+    };
     Joystick.prototype.getDirection = function (point) {
         if (Phaser.Math.distance(point.x, point.y, this._center.x, this._center.y) > (this._r + this._offset)) {
             return undefined;
         }
         var rad = Phaser.Math.angleBetweenPoints(this._center, point);
+        if (rad > -0.5 * this._radMin && rad < 0.5 * this._radMin) {
+            return Directions.Right;
+        }
+        if (rad > 0.5 * this._radMin && rad < this._radMin) {
+            return Directions.DownRight;
+        }
+        if (rad > this._radMin && rad < 1.5 * this._radMin) {
+            return Directions.Down;
+        }
+        if (rad > 1.5 * this._radMin && rad < 2 * this._radMin) {
+            return Directions.DownLeft;
+        }
+        if (rad > 2 * this._radMin || rad < -2 * this._radMin) {
+            return Directions.Left;
+        }
+        if (rad < -0.5 * this._radMin && rad > -1 * this._radMin) {
+            return Directions.UpRight;
+        }
+        if (rad < -1 * this._radMin && rad > -1.5 * this._radMin) {
+            return Directions.Up;
+        }
+        if (rad < -1.5 * this._radMin && rad > -2 * this._radMin) {
+            return Directions.UpLeft;
+        }
         return Directions.None;
     };
     return Joystick;
@@ -98,10 +149,11 @@ var Joystick = (function () {
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var TheGame = (function () {
     function TheGame() {
-        this.game = new Phaser.Game(window.innerWidth * window.devicePixelRatio, window.innerHeight * window.devicePixelRatio, Phaser.CANVAS, 'content', {
+        this.game = new Phaser.Game(window.screen.availWidth * window.devicePixelRatio, window.screen.availHeight * window.devicePixelRatio, Phaser.CANVAS, 'content', {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
+        // this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.EXACT_FIT;
     }
     TheGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
@@ -165,13 +217,25 @@ var TheGame = (function () {
             gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
         // mini map.
         this._miniMap = new MiniMap(this.game, this._player);
-        this._joystick = new Joystick(this.game);
-        this._joystick.drawJoystick();
+        if (isMobile.any()) {
+            this._joystick = new Joystick(this.game);
+            this._joystick.drawJoystick();
+        }
     };
     TheGame.prototype.update = function () {
         var _this = this;
+        var message = undefined;
         // First, update tank itself.
-        var message = this._player.update(this.game.input.activePointer.isDown);
+        if (this._joystick != undefined) {
+            var result = this._joystick.checkPointer();
+            if (this._player.direction != result.direction) {
+                this._player.drive(result.direction);
+            }
+            message = this._player.update(result.fire);
+        }
+        else {
+            message = this._player.update(this.game.input.activePointer.isDown);
+        }
         this._socket.emit(tankUpdateEventName, message);
         // Then, check collision.
         if (this._enemies != undefined) {
@@ -183,9 +247,6 @@ var TheGame = (function () {
             });
         }
         this._miniMap.updateMap(this._player.direction != Directions.None);
-        if (this.game.input.activePointer.isDown) {
-            this._joystick.getDirection(this.game.input.activePointer.position);
-        }
     };
     // #region: privates.
     TheGame.prototype.onKeyDown = function (e) {
@@ -262,6 +323,26 @@ var TheGame = (function () {
     };
     return TheGame;
 }());
+var isMobile = {
+    Android: function () {
+        return navigator.userAgent.match(/Android/i);
+    },
+    BlackBerry: function () {
+        return navigator.userAgent.match(/BlackBerry/i);
+    },
+    iOS: function () {
+        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
+    },
+    Opera: function () {
+        return navigator.userAgent.match(/Opera Mini/i);
+    },
+    Windows: function () {
+        return navigator.userAgent.match(/IEMobile/i);
+    },
+    any: function () {
+        return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
+    }
+};
 /// *** Game main class *** ///
 window.onload = function () {
     var game = new TheGame();
