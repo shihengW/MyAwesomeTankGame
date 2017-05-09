@@ -8,23 +8,23 @@ class Tank {
 
     // Others.
     private _ownerGame: Phaser.Game;
-    private _blood: number;
     private _gameOver: boolean = false;
 
     // Publics.
+    blood: number;
     id: number;
     direction: Directions = Directions.None;
     
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
         this._ownerGame = game;
         this.id = id;
-        this._blood = 100;
+        this.blood = 100;
 
         // Seperate tank body and gun tower.           
         this._tankbody = game.add.sprite(x, y, tankbodyName);
         this._guntower = game.add.sprite(x, y, guntowerName);
         var style = { font: "20px Arial", fill: "#00A000", align: "center" };
-        this._bloodText = game.add.text(x, y - BloodTextOffset, <string><any>(this._blood), style);
+        this._bloodText = game.add.text(x, y - BloodTextOffset, <string><any>(this.blood), style);
 
         this._tankbody.anchor.set(0.5, 0.5);
         this._guntower.anchor.set(0.5, 0.5);
@@ -56,7 +56,7 @@ class Tank {
     update(shouldFire): Message {
         // If game over, do nothing.
         if (this._gameOver) { return this.getJson(undefined); }
-        if (this._blood <= 0) {
+        if (this.blood <= 0) {
             this._gameOver = true;
             Tank.onExplode(this);
             return this.getJson(undefined);
@@ -97,29 +97,27 @@ class Tank {
 
     combat(another: Tank) : HitMessage {
         let self = this;
+        let result: HitMessage = undefined;
+
         another._bullets.forEachAlive((item:Phaser.Sprite) => {
             self._ownerGame.physics.arcade.collide(item, self._tankbody, 
                 (bullet: Phaser.Sprite, notUsed: any) => {
-                    return self.onHit(bullet);
+                    result = self.onHit(bullet);
                 });
         }, this);
 
         this._bullets.forEachAlive((item: Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, another, () => { item.kill(); });
+            self._ownerGame.physics.arcade.collide(item, another.getBody(), () => { 
+                Tank.onHitVisual(item, another.getBody(), self._ownerGame);
+            })
         }, this);
 
-        return undefined;
+        return result;
     }
 
     explode() {
         let self = this;
         Tank.onExplode(self);
-    }
-
-    hitEffect(x: number, y: number) {
-        let emitter = this._ownerGame.add.emitter(x, y);
-        emitter.makeParticles(particleName, 0, 50, false, false);
-        emitter.explode(300, 50);
     }
 
 // #regions privates.
@@ -132,7 +130,7 @@ class Tank {
         this._guntower.position = this._tankbody.position;
         this._bloodText.position = new Phaser.Point(this._tankbody.position.x, 
             this._tankbody.position.y + BloodTextOffset);
-        this._bloodText.text = <string><any>this._blood;
+        this._bloodText.text = <string><any>this.blood;
     }
 
     private nextFireTime: number = 0;
@@ -217,7 +215,7 @@ class Tank {
             gunAngle: this._guntower.angle,
             tankAngle: this._tankbody.angle,
             firing: firingTo,
-            blood: this._blood
+            blood: this.blood
         }
     }
 
@@ -229,7 +227,7 @@ class Tank {
         }
 
         // if blood is less or equal to 0, set gameover tag, then explode.
-        if (this._blood <= 0) {
+        if (this.blood <= 0) {
             this._gameOver = true;
             Tank.onExplode(this);
             return;
@@ -245,9 +243,9 @@ class Tank {
         this._guntower.position = position;
         this._bloodText.position = new Phaser.Point(position.x, position.y + BloodTextOffset);
         
-        this._blood = blood;
+        this.blood = blood;
         this._bloodText.text = <string><any>blood;
-        if (this._blood <= 0) {
+        if (this.blood <= 0) {
             let self = this;
             Tank.onExplode(self);
         }
@@ -259,9 +257,9 @@ class Tank {
 
     private static onExplode(self: Tank) {
         // Emit and destroy everything.
-        let emitter = self._ownerGame.add.emitter(self._tankbody.position.x, self._tankbody.position.y);
-        emitter.makeParticles(particleName, 0, 50, false, false);
-        emitter.explode(500, 50);
+        let emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
+        emitter.makeParticles(particleName, 0, 200, true, false);
+        emitter.explode(2000, 200);
         
         self._tankbody.destroy();
         self._guntower.destroy();
@@ -269,21 +267,29 @@ class Tank {
         self._bullets.destroy();
     }
 
-    private onHit(bullet: Phaser.Sprite): HitMessage {
-        this._blood -= Math.random() * Damage;
-        bullet.kill();
+    private static onHitVisual(bullet: Phaser.Sprite, tankBody: Phaser.Sprite, game: Phaser.Game) : { hitX: number, hitY: number } {
         // Now we are creating the particle emitter, centered to the world
-        let hitX: number = (bullet.x + this._tankbody.body.x) / 2;
-        let hitY: number =  (bullet.y + this._tankbody.body.y) / 2;
-        let emitter = this._ownerGame.add.emitter(hitX, hitY);
+        let hitX: number = (bullet.x + tankBody.body.x) / 2;
+        let hitY: number =  (bullet.y + tankBody.body.y) / 2;
+        bullet.kill();
+
+        // Get effect.
+        let emitter = game.add.emitter(hitX, hitY);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
+        return { hitX: hitX, hitY: hitY };
+    }
+
+    private onHit(bullet: Phaser.Sprite): HitMessage {
+        this.blood -= Math.floor(Math.random() * Damage);
+        let self = this;
+        let result = Tank.onHitVisual(bullet, self._tankbody, this._ownerGame);
 
         return {
             tankId: this.id,
-            hitX: hitX,
-            hitY: hitY,
-            blood: this._blood
+            hitX: result.hitX,
+            hitY: result.hitY,
+            blood: this.blood
         }
     }
 

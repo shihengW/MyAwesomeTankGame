@@ -195,18 +195,6 @@ var TheGame = (function () {
         this._socket.on(tankUpdateGlobalEventName, function (player) {
             TheGame.updateEnemyByJson(self, player);
         });
-        // Hit -> hit.
-        this._socket.on(hitGlobalEventName, function (player) {
-            var tank = TheGame.getOrAddEnemy(self, player);
-            // If player has no blood, remove it from the list.
-            if (player.blood <= 0) {
-                TheGame.removeEnemyByJson(self, player);
-                tank.explode();
-            }
-            else {
-                tank.hitEffect(player.hitX, player.hitY);
-            }
-        });
         this._socket.on(goneGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
             var tank = TheGame.removeEnemyByJson(self, player);
@@ -246,6 +234,7 @@ var TheGame = (function () {
                 }
             });
         }
+        // Finally, update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     };
     // #region: privates.
@@ -478,12 +467,12 @@ var Tank = (function () {
         this.nextFireTime = 0;
         this._ownerGame = game;
         this.id = id;
-        this._blood = 100;
+        this.blood = 100;
         // Seperate tank body and gun tower.           
         this._tankbody = game.add.sprite(x, y, tankbodyName);
         this._guntower = game.add.sprite(x, y, guntowerName);
         var style = { font: "20px Arial", fill: "#00A000", align: "center" };
-        this._bloodText = game.add.text(x, y - BloodTextOffset, (this._blood), style);
+        this._bloodText = game.add.text(x, y - BloodTextOffset, (this.blood), style);
         this._tankbody.anchor.set(0.5, 0.5);
         this._guntower.anchor.set(0.5, 0.5);
         this._bloodText.anchor.set(0.5, 0.5);
@@ -512,7 +501,7 @@ var Tank = (function () {
         if (this._gameOver) {
             return this.getJson(undefined);
         }
-        if (this._blood <= 0) {
+        if (this.blood <= 0) {
             this._gameOver = true;
             Tank.onExplode(this);
             return this.getJson(undefined);
@@ -546,24 +535,22 @@ var Tank = (function () {
     };
     Tank.prototype.combat = function (another) {
         var self = this;
+        var result = undefined;
         another._bullets.forEachAlive(function (item) {
             self._ownerGame.physics.arcade.collide(item, self._tankbody, function (bullet, notUsed) {
-                return self.onHit(bullet);
+                result = self.onHit(bullet);
             });
         }, this);
         this._bullets.forEachAlive(function (item) {
-            self._ownerGame.physics.arcade.collide(item, another, function () { item.kill(); });
+            self._ownerGame.physics.arcade.collide(item, another.getBody(), function () {
+                Tank.onHitVisual(item, another.getBody(), self._ownerGame);
+            });
         }, this);
-        return undefined;
+        return result;
     };
     Tank.prototype.explode = function () {
         var self = this;
         Tank.onExplode(self);
-    };
-    Tank.prototype.hitEffect = function (x, y) {
-        var emitter = this._ownerGame.add.emitter(x, y);
-        emitter.makeParticles(particleName, 0, 50, false, false);
-        emitter.explode(300, 50);
     };
     // #regions privates.
     Tank.prototype.syncPosition = function () {
@@ -573,7 +560,7 @@ var Tank = (function () {
         // Second, force to coordinate the guntower, tankbody and blood text
         this._guntower.position = this._tankbody.position;
         this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + BloodTextOffset);
-        this._bloodText.text = this._blood;
+        this._bloodText.text = this.blood;
     };
     Tank.prototype.shouldFire = function (firingTo) {
         return firingTo != undefined
@@ -644,7 +631,7 @@ var Tank = (function () {
             gunAngle: this._guntower.angle,
             tankAngle: this._tankbody.angle,
             firing: firingTo,
-            blood: this._blood
+            blood: this.blood
         };
     };
     Tank.prototype.updateAsPuppet = function (gunAngle, tankAngle, position, firing, blood) {
@@ -653,7 +640,7 @@ var Tank = (function () {
             return;
         }
         // if blood is less or equal to 0, set gameover tag, then explode.
-        if (this._blood <= 0) {
+        if (this.blood <= 0) {
             this._gameOver = true;
             Tank.onExplode(this);
             return;
@@ -665,9 +652,9 @@ var Tank = (function () {
         this._tankbody.position = position;
         this._guntower.position = position;
         this._bloodText.position = new Phaser.Point(position.x, position.y + BloodTextOffset);
-        this._blood = blood;
+        this.blood = blood;
         this._bloodText.text = blood;
-        if (this._blood <= 0) {
+        if (this.blood <= 0) {
             var self_1 = this;
             Tank.onExplode(self_1);
         }
@@ -677,28 +664,34 @@ var Tank = (function () {
     };
     Tank.onExplode = function (self) {
         // Emit and destroy everything.
-        var emitter = self._ownerGame.add.emitter(self._tankbody.position.x, self._tankbody.position.y);
-        emitter.makeParticles(particleName, 0, 50, false, false);
-        emitter.explode(500, 50);
+        var emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
+        emitter.makeParticles(particleName, 0, 200, true, false);
+        emitter.explode(2000, 200);
         self._tankbody.destroy();
         self._guntower.destroy();
         self._bloodText.destroy();
         self._bullets.destroy();
     };
-    Tank.prototype.onHit = function (bullet) {
-        this._blood -= Math.random() * Damage;
-        bullet.kill();
+    Tank.onHitVisual = function (bullet, tankBody, game) {
         // Now we are creating the particle emitter, centered to the world
-        var hitX = (bullet.x + this._tankbody.body.x) / 2;
-        var hitY = (bullet.y + this._tankbody.body.y) / 2;
-        var emitter = this._ownerGame.add.emitter(hitX, hitY);
+        var hitX = (bullet.x + tankBody.body.x) / 2;
+        var hitY = (bullet.y + tankBody.body.y) / 2;
+        bullet.kill();
+        // Get effect.
+        var emitter = game.add.emitter(hitX, hitY);
         emitter.makeParticles(particleName, 0, 50, false, false);
         emitter.explode(300, 50);
+        return { hitX: hitX, hitY: hitY };
+    };
+    Tank.prototype.onHit = function (bullet) {
+        this.blood -= Math.floor(Math.random() * Damage);
+        var self = this;
+        var result = Tank.onHitVisual(bullet, self._tankbody, this._ownerGame);
         return {
             tankId: this.id,
-            hitX: hitX,
-            hitY: hitY,
-            blood: this._blood
+            hitX: result.hitX,
+            hitY: result.hitY,
+            blood: this.blood
         };
     };
     return Tank;

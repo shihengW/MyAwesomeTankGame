@@ -72,19 +72,6 @@ class TheGame {
             TheGame.updateEnemyByJson(self, player);
          });
 
-        // Hit -> hit.
-        this._socket.on(hitGlobalEventName, function(player: HitMessage) {
-            let tank = TheGame.getOrAddEnemy(self, player);
-            // If player has no blood, remove it from the list.
-            if (player.blood <= 0) {
-                TheGame.removeEnemyByJson(self, player);
-                tank.explode();
-            }
-            else {
-                tank.hitEffect(player.hitX, player.hitY);
-            }
-        });
-
         this._socket.on(goneGlobalEventName, function(player: Message) {
             // If player has no blood, remove it from the list.
             let tank = TheGame.removeEnemyByJson(self, player);
@@ -128,6 +115,7 @@ class TheGame {
             });
         }
 
+        // Finally, update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     }
 
