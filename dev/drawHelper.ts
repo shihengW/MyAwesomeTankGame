@@ -30,6 +30,8 @@ class MiniMap {
 
     constructor(game: Phaser.Game, player: Tank) {
         this._graphics = game.add.graphics(0, 0);
+        // This should not be affected by camera.
+        this._graphics.fixedToCamera = true;
         this._player = player;
         this._game = game;
     }
@@ -39,8 +41,7 @@ class MiniMap {
         if (show) {
             this._showMap = true;
             this._graphics.lineStyle(10, 0xE03F00, 0.5);
-            this._graphics.drawRect(this._game.camera.x + this._offsets.x, this._game.camera.y + this._offsets.y,
-                this._bounds.x, this._bounds.y);
+            this._graphics.drawRect(this._offsets.x, this._offsets.y, this._bounds.x, this._bounds.y);
 
             let spot = this.getPlayer();
             this._graphics.lineStyle(4, 0x00AF00, 0.8);
@@ -49,8 +50,8 @@ class MiniMap {
     }
 
     private getPlayer() : Phaser.Point {
-        let x: number = (this._player.getBody()).position.x / GameWidth * this._bounds.x + this._game.camera.x + this._offsets.x;
-        let y: number = (this._player.getBody()).position.y / GameHeight * this._bounds.y + + this._game.camera.y + this._offsets.y;
+        let x: number = (this._player.getBody()).position.x / GameWidth * this._bounds.x + this._offsets.x;
+        let y: number = (this._player.getBody()).position.y / GameHeight * this._bounds.y + this._offsets.y;
         return new Phaser.Point(x, y);
     }    
 }

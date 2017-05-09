@@ -95,7 +95,6 @@ class TheGame {
     }
 
     update() {
-        this._miniMap.updateMap(this._player.direction != Directions.None);
         // First, update tank itself.
         let message = this._player.update(this.game.input.activePointer.isDown);
         this._socket.emit(tankUpdateEventName, message);
@@ -109,6 +108,8 @@ class TheGame {
                 }
             });
         }
+
+        this._miniMap.updateMap(this._player.direction != Directions.None);
     }
 
 // #region: privates.
