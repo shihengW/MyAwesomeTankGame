@@ -32,6 +32,33 @@ var DrawHelpers = (function () {
     };
     return DrawHelpers;
 }());
+var MiniMap = (function () {
+    function MiniMap(game, player) {
+        this._bounds = new Phaser.Point(100, 80);
+        this._offsets = new Phaser.Point(10, 10);
+        this._showMap = false;
+        this._graphics = game.add.graphics(0, 0);
+        this._player = player;
+        this._game = game;
+    }
+    MiniMap.prototype.updateMap = function (show) {
+        this._graphics.clear();
+        if (show) {
+            this._showMap = true;
+            this._graphics.lineStyle(10, 0xE03F00, 0.5);
+            this._graphics.drawRect(this._game.camera.x + this._offsets.x, this._game.camera.y + this._offsets.y, this._bounds.x, this._bounds.y);
+            var spot = this.getPlayer();
+            this._graphics.lineStyle(4, 0x00AF00, 0.8);
+            this._graphics.drawRect(spot.x, spot.y, 4, 4);
+        }
+    };
+    MiniMap.prototype.getPlayer = function () {
+        var x = (this._player.getBody()).position.x / GameWidth * this._bounds.x + this._game.camera.x + this._offsets.x;
+        var y = (this._player.getBody()).position.y / GameHeight * this._bounds.y + +this._game.camera.y + this._offsets.y;
+        return new Phaser.Point(x, y);
+    };
+    return MiniMap;
+}());
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
@@ -102,9 +129,12 @@ var TheGame = (function () {
         // Finally, let others know me.
         this._socket.emit(addNewEventName, { tankId: id, x: x, y: y,
             gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
+        // mini map.
+        this._miniMap = new MiniMap(this.game, this._player);
     };
     TheGame.prototype.update = function () {
         var _this = this;
+        this._miniMap.updateMap(this._player.direction != Directions.None);
         // First, update tank itself.
         var message = this._player.update(this.game.input.activePointer.isDown);
         this._socket.emit(tankUpdateEventName, message);

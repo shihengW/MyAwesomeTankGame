@@ -10,6 +10,7 @@ class TheGame {
     private _player: Tank;
     private _enemies: Tank[];
     private _socket: any;
+    private _miniMap: MiniMap;
 
     constructor() {
         this.game = new Phaser.Game(window.innerWidth * window.devicePixelRatio, 
@@ -88,9 +89,13 @@ class TheGame {
         // Finally, let others know me.
         this._socket.emit(addNewEventName, { tankId: id, x: x, y: y,
             gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
+
+        // mini map.
+        this._miniMap = new MiniMap(this.game, this._player);
     }
 
     update() {
+        this._miniMap.updateMap(this._player.direction != Directions.None);
         // First, update tank itself.
         let message = this._player.update(this.game.input.activePointer.isDown);
         this._socket.emit(tankUpdateEventName, message);
