@@ -305,7 +305,7 @@ var TheGame = (function () {
     };
     TheGame.updateEnemyByJson = function (self, enemy) {
         var tank = TheGame.getOrAddEnemy(self, enemy);
-        tank.updateByJson(enemy);
+        tank.updateAsPuppet(enemy);
     };
     TheGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
         var realKey = self.game.input.keyboard.addKey(key);
@@ -488,36 +488,19 @@ var GameWidth = 5000;
 // TODO: Should use group when figure out how
 var Tank = (function () {
     function Tank(game, id, x, y) {
-        this._gameOver = false;
         this.direction = Directions.None;
+        this._gameOver = false;
         this.nextFireTime = 0;
+        // Set-up basics.
         this._ownerGame = game;
         this.id = id;
         this.blood = 100;
-        // Seperate tank body and gun tower.           
-        this._tankbody = game.add.sprite(x, y, tankbodyName);
-        this._guntower = game.add.sprite(x, y, guntowerName);
-        var style = { font: "20px Arial", fill: "#00A000", align: "center" };
-        this._bloodText = game.add.text(x, y - BloodTextOffset, (this.blood), style);
-        this._tankbody.anchor.set(0.5, 0.5);
-        this._guntower.anchor.set(0.5, 0.5);
-        this._bloodText.anchor.set(0.5, 0.5);
-        // Setup physics
-        game.physics.arcade.enable(this._tankbody);
-        this._tankbody.body.collideWorldBounds = true;
-        this._tankbody.body.bounce.set(0.1, 0.1);
-        this._tankbody.body.maxVelocity.set(MaxVelocity);
-        // Create bullets.
-        this._bullets = game.add.group();
-        this._bullets.enableBody = true;
-        this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this._bullets.createMultiple(50, bulletName);
-        this._bullets.setAll("checkWorldBounds", true);
-        this._bullets.setAll("outOfBoundsKill", true);
-        this._bullets.forEachAlive(function (item) {
-            item.body.bounce.set(0.1, 0.1);
-            item.body.mass = 0.1;
-        }, this);
+        // Set-up body, gun and text.
+        var tank = this.createTank(game, x, y);
+        this._tankbody = tank.body;
+        this._guntower = tank.gun;
+        this._bloodText = tank.text;
+        this._bullets = tank.bullets;
     }
     Tank.prototype.getBody = function () {
         return this._tankbody;
@@ -527,12 +510,7 @@ var Tank = (function () {
         if (this._gameOver) {
             return this.getJson(undefined);
         }
-        if (this.blood <= 0) {
-            this._gameOver = true;
-            Tank.onExplode(this);
-            return this.getJson(undefined);
-        }
-        // Move.
+        // Sync position.
         this.syncPosition();
         // Fire.
         var fire = undefined;
@@ -542,8 +520,8 @@ var Tank = (function () {
         // Return result.
         return this.getJson(fire);
     };
-    Tank.prototype.updateByJson = function (params) {
-        this.updateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
+    Tank.prototype.updateAsPuppet = function (params) {
+        this.updateAsPuppetCore(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
     };
     Tank.prototype.drive = function (d) {
         if (this._gameOver) {
@@ -562,23 +540,55 @@ var Tank = (function () {
     Tank.prototype.combat = function (another) {
         var self = this;
         var result = undefined;
+        // Check if I am hit by anyone.
         another._bullets.forEachAlive(function (item) {
             self._ownerGame.physics.arcade.collide(item, self._tankbody, function (bullet, notUsed) {
                 result = self.onHit(bullet);
             });
         }, this);
+        // Check if I hit anyone.
         this._bullets.forEachAlive(function (item) {
             self._ownerGame.physics.arcade.collide(item, another.getBody(), function () {
                 Tank.onHitVisual(item, another.getBody(), self._ownerGame);
             });
         }, this);
+        // Check if I am dead
+        if (this.blood <= 0) {
+            this._gameOver = true;
+            Tank.onExplode(this);
+        }
         return result;
     };
     Tank.prototype.explode = function () {
         var self = this;
         Tank.onExplode(self);
     };
-    // #regions privates.
+    Tank.prototype.createTank = function (game, x, y) {
+        var body = game.add.sprite(x, y, tankbodyName);
+        var gun = game.add.sprite(x, y, guntowerName);
+        var text = game.add.text(x, y - BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
+        body.anchor.set(0.5, 0.5);
+        gun.anchor.set(0.5, 0.5);
+        text.anchor.set(0.5, 0.5);
+        // Setup physics
+        game.physics.arcade.enable(body);
+        body.body.collideWorldBounds = true;
+        body.body.bounce.set(0.1, 0.1);
+        body.body.maxVelocity.set(MaxVelocity);
+        // Create bullets.
+        var bullets = game.add.group();
+        bullets.enableBody = true;
+        bullets.physicsBodyType = Phaser.Physics.ARCADE;
+        bullets.createMultiple(50, bulletName);
+        bullets.setAll("checkWorldBounds", true);
+        bullets.setAll("outOfBoundsKill", true);
+        bullets.forEachAlive(function (item) {
+            item.body.bounce.set(0.1, 0.1);
+            item.anchor.set(0.5, 0.5);
+            item.body.mass = 0.1;
+        }, this);
+        return { body: body, gun: gun, text: text, bullets: bullets };
+    };
     Tank.prototype.syncPosition = function () {
         // First, move gun tower to point to mouse.
         var angle = this._ownerGame.physics.arcade.angleToPointer(this._guntower);
@@ -588,46 +598,14 @@ var Tank = (function () {
         this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + BloodTextOffset);
         this._bloodText.text = this.blood;
     };
-    Tank.prototype.shouldFire = function (firingTo) {
-        return firingTo != undefined
-            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
-    };
-    Tank.prototype.calculateTrajectory = function () {
-        // Get a random offset. I don't think I can support random offset since the current
-        // comm system cannot do the coordinate if there is a offset.
-        var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
-        var theta = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
-        // Set-up constants.
-        var halfLength = this._guntower.height / 2;
-        var sinTheta = Math.sin(theta);
-        var reverseCosTheta = -1 * Math.cos(theta);
-        var tankPosition = this._tankbody.body.center;
-        // Bullet start position and move to position.
-        var startX = sinTheta * halfLength + tankPosition.x;
-        var startY = reverseCosTheta * halfLength + tankPosition.y;
-        var moveToX = startX + sinTheta * Number.MAX_VALUE;
-        var moveToY = startY + reverseCosTheta * Number.MAX_VALUE;
-        return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
-            startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
-    };
-    Tank.prototype.fireInternal = function (startX, startY, moveToX, moveToY) {
-        // Get bullet.
-        var bullet = this._bullets.getFirstDead();
-        bullet.angle = this._guntower.angle;
-        bullet.anchor.set(0.5, 0.5);
-        bullet.reset(startX, startY);
-        // bullet.body.angularVelocity = 5000;
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
-    };
     Tank.prototype.fire = function (firingTo) {
         if (firingTo === void 0) { firingTo = undefined; }
         if (!this.shouldFire(firingTo)) {
             return undefined;
         }
-        // Set time.
-        this.nextFireTime = this._ownerGame.time.now + FireRate;
         // Calculate the trajectory.
         var trajectory = this.calculateTrajectory();
+        // Force set direction?
         if (firingTo != undefined) {
             trajectory.theta = firingTo;
         }
@@ -660,7 +638,42 @@ var Tank = (function () {
             blood: this.blood
         };
     };
-    Tank.prototype.updateAsPuppet = function (gunAngle, tankAngle, position, firing, blood) {
+    Tank.prototype.shouldFire = function (firingTo) {
+        var result = firingTo != undefined
+            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
+        if (result) {
+            // Set time.
+            this.nextFireTime = this._ownerGame.time.now + FireRate;
+        }
+        return result;
+    };
+    Tank.prototype.calculateTrajectory = function () {
+        // Get a random offset. I don't think I can support random offset since the current
+        // comm system cannot do the coordinate if there is a offset.
+        var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
+        var theta = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
+        // Set-up constants.
+        var halfLength = this._guntower.height / 2;
+        var sinTheta = Math.sin(theta);
+        var reverseCosTheta = -1 * Math.cos(theta);
+        var tankPosition = this._tankbody.body.center;
+        // Bullet start position and move to position.
+        var startX = sinTheta * halfLength + tankPosition.x;
+        var startY = reverseCosTheta * halfLength + tankPosition.y;
+        var moveToX = startX + sinTheta * Number.MAX_VALUE;
+        var moveToY = startY + reverseCosTheta * Number.MAX_VALUE;
+        return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
+            startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
+    };
+    Tank.prototype.fireInternal = function (startX, startY, moveToX, moveToY) {
+        // Get bullet.
+        var bullet = this._bullets.getFirstDead();
+        bullet.angle = this._guntower.angle;
+        bullet.reset(startX, startY);
+        // bullet.body.angularVelocity = 5000;
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
+    };
+    Tank.prototype.updateAsPuppetCore = function (gunAngle, tankAngle, position, firing, blood) {
         // if already gameover, do nothing.
         if (this._gameOver) {
             return;

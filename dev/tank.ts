@@ -1,52 +1,22 @@
 // TODO: Should use group when figure out how
 class Tank {
-    // Things that will be displayed.
-    private _guntower: Phaser.Sprite;
-    private _tankbody: Phaser.Sprite;
-    private _bloodText: Phaser.Text;
-    private _bullets: Phaser.Group;
-
-    // Others.
-    private _ownerGame: Phaser.Game;
-    private _gameOver: boolean = false;
-
     // Publics.
     blood: number;
     id: number;
     direction: Directions = Directions.None;
     
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
+        // Set-up basics.
         this._ownerGame = game;
         this.id = id;
         this.blood = 100;
 
-        // Seperate tank body and gun tower.           
-        this._tankbody = game.add.sprite(x, y, tankbodyName);
-        this._guntower = game.add.sprite(x, y, guntowerName);
-        var style = { font: "20px Arial", fill: "#00A000", align: "center" };
-        this._bloodText = game.add.text(x, y - BloodTextOffset, <string><any>(this.blood), style);
-
-        this._tankbody.anchor.set(0.5, 0.5);
-        this._guntower.anchor.set(0.5, 0.5);
-        this._bloodText.anchor.set(0.5, 0.5);
-    
-        // Setup physics
-        game.physics.arcade.enable(this._tankbody);
-        this._tankbody.body.collideWorldBounds = true;
-        this._tankbody.body.bounce.set(0.1, 0.1);
-        this._tankbody.body.maxVelocity.set(MaxVelocity);
-                
-        // Create bullets.
-        this._bullets = game.add.group();
-        this._bullets.enableBody = true;
-        this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        this._bullets.createMultiple(50, bulletName);
-
-        this._bullets.setAll("checkWorldBounds", true);
-        this._bullets.setAll("outOfBoundsKill", true);
-        this._bullets.forEachAlive((item:Phaser.Sprite) => { 
-            item.body.bounce.set(0.1, 0.1);
-            item.body.mass = 0.1; }, this);
+        // Set-up body, gun and text.
+        let tank = this.createTank(game, x, y);
+        this._tankbody = tank.body;
+        this._guntower = tank.gun;
+        this._bloodText = tank.text;
+        this._bullets = tank.bullets;
     }
 
     getBody() : Phaser.Sprite {
@@ -55,14 +25,10 @@ class Tank {
 
     update(shouldFire): Message {
         // If game over, do nothing.
-        if (this._gameOver) { return this.getJson(undefined); }
-        if (this.blood <= 0) {
-            this._gameOver = true;
-            Tank.onExplode(this);
-            return this.getJson(undefined);
+        if (this._gameOver) { 
+            return this.getJson(undefined); 
         }
-
-        // Move.
+        // Sync position.
         this.syncPosition();
 
         // Fire.
@@ -73,8 +39,8 @@ class Tank {
         return this.getJson(fire);
     }
 
-    updateByJson(params: Message) {
-        this.updateAsPuppet(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
+    updateAsPuppet(params: Message) {
+        this.updateAsPuppetCore(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
     }
 
     drive(d: Directions) {
@@ -99,6 +65,7 @@ class Tank {
         let self = this;
         let result: HitMessage = undefined;
 
+        // Check if I am hit by anyone.
         another._bullets.forEachAlive((item:Phaser.Sprite) => {
             self._ownerGame.physics.arcade.collide(item, self._tankbody, 
                 (bullet: Phaser.Sprite, notUsed: any) => {
@@ -106,11 +73,18 @@ class Tank {
                 });
         }, this);
 
+        // Check if I hit anyone.
         this._bullets.forEachAlive((item: Phaser.Sprite) => {
             self._ownerGame.physics.arcade.collide(item, another.getBody(), () => { 
                 Tank.onHitVisual(item, another.getBody(), self._ownerGame);
             })
         }, this);
+
+        // Check if I am dead
+        if (this.blood <= 0) {
+            this._gameOver = true;
+            Tank.onExplode(this);
+        }
 
         return result;
     }
@@ -121,6 +95,45 @@ class Tank {
     }
 
 // #regions privates.
+    private _guntower: Phaser.Sprite;
+    private _tankbody: Phaser.Sprite;
+    private _bloodText: Phaser.Text;
+    private _bullets: Phaser.Group;
+    private _ownerGame: Phaser.Game;
+    private _gameOver: boolean = false;
+
+    private createTank(game: Phaser.Game, x: number, y: number) : 
+            { body: Phaser.Sprite, gun: Phaser.Sprite, text: Phaser.Text, bullets: Phaser.Group } {
+        let body = game.add.sprite(x, y, tankbodyName);
+        let gun = game.add.sprite(x, y, guntowerName);
+        let text = game.add.text(x, y - BloodTextOffset, <string><any>(this.blood), 
+                    { font: "20px Arial", fill: "#00A000", align: "center" });
+
+        body.anchor.set(0.5, 0.5);
+        gun.anchor.set(0.5, 0.5);
+        text.anchor.set(0.5, 0.5);
+    
+        // Setup physics
+        game.physics.arcade.enable(body);
+        body.body.collideWorldBounds = true;
+        body.body.bounce.set(0.1, 0.1);
+        body.body.maxVelocity.set(MaxVelocity);
+        
+        // Create bullets.
+        let bullets = game.add.group();
+        bullets.enableBody = true;
+        bullets.physicsBodyType = Phaser.Physics.ARCADE;
+        bullets.createMultiple(50, bulletName);
+
+        bullets.setAll("checkWorldBounds", true);
+        bullets.setAll("outOfBoundsKill", true);
+        bullets.forEachAlive((item:Phaser.Sprite) => { 
+            item.body.bounce.set(0.1, 0.1);
+            item.anchor.set(0.5, 0.5);
+            item.body.mass = 0.1; }, this);
+        return { body: body, gun: gun, text: text, bullets: bullets};
+    }
+
     private syncPosition() {
         // First, move gun tower to point to mouse.
         const angle: number = this._ownerGame.physics.arcade.angleToPointer(this._guntower);
@@ -133,62 +146,22 @@ class Tank {
         this._bloodText.text = <string><any>this.blood;
     }
 
-    private nextFireTime: number = 0;
-
-    private shouldFire(firingTo: number): boolean {
-        return firingTo != undefined
-            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
-    }
-
-    private calculateTrajectory(): Trajectory {
-        // Get a random offset. I don't think I can support random offset since the current
-        // comm system cannot do the coordinate if there is a offset.
-        const randomAngleOffset: number = (Math.random() - 0.5) * AngleOffsetBase;
-        const theta: number = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
-
-        // Set-up constants.
-        const halfLength: number = this._guntower.height / 2;
-        const sinTheta = Math.sin(theta);
-        const reverseCosTheta = -1 * Math.cos(theta);
-        const tankPosition = this._tankbody.body.center;
-
-        // Bullet start position and move to position.
-        let startX: number = sinTheta * halfLength + tankPosition.x;
-        let startY: number = reverseCosTheta * halfLength + tankPosition.y;
-        let moveToX: number = startX + sinTheta * Number.MAX_VALUE;
-        let moveToY: number = startY + reverseCosTheta * Number.MAX_VALUE;
-
-        return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta, 
-            startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
-    }
-
-    private fireInternal(startX: number, startY: number, moveToX: number, moveToY: number) {
-        // Get bullet.
-        const bullet: Phaser.Sprite = this._bullets.getFirstDead();
-        bullet.angle = this._guntower.angle;
-        bullet.anchor.set(0.5, 0.5);
-        bullet.reset(startX, startY);
-        // bullet.body.angularVelocity = 5000;
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
-    }
-
     private fire(firingTo: number = undefined) : number {
         if (!this.shouldFire(firingTo)) {
             return undefined;
         }
 
-        // Set time.
-        this.nextFireTime = this._ownerGame.time.now + FireRate;
-
         // Calculate the trajectory.
         let trajectory: Trajectory = this.calculateTrajectory();
 
+        // Force set direction?
         if (firingTo != undefined) {
             trajectory.theta = firingTo;
         }
         
         // Fire.
         this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
+
         // Let's shake it shake it.
         this._ownerGame.camera.shake(0.005, 50);
         return trajectory.theta;
@@ -219,8 +192,53 @@ class Tank {
         }
     }
 
-    private updateAsPuppet(gunAngle: number, tankAngle: number, 
-        position: Phaser.Point, firing: number, blood: number) {
+    private nextFireTime: number = 0;
+
+    private shouldFire(firingTo: number): boolean {
+        let result = firingTo != undefined
+            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
+
+        if (result) {
+            // Set time.
+            this.nextFireTime = this._ownerGame.time.now + FireRate;
+        }
+
+        return result;
+    }
+
+    private calculateTrajectory(): Trajectory {
+        // Get a random offset. I don't think I can support random offset since the current
+        // comm system cannot do the coordinate if there is a offset.
+        const randomAngleOffset: number = (Math.random() - 0.5) * AngleOffsetBase;
+        const theta: number = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
+
+        // Set-up constants.
+        const halfLength: number = this._guntower.height / 2;
+        const sinTheta = Math.sin(theta);
+        const reverseCosTheta = -1 * Math.cos(theta);
+        const tankPosition = this._tankbody.body.center;
+
+        // Bullet start position and move to position.
+        let startX: number = sinTheta * halfLength + tankPosition.x;
+        let startY: number = reverseCosTheta * halfLength + tankPosition.y;
+        let moveToX: number = startX + sinTheta * Number.MAX_VALUE;
+        let moveToY: number = startY + reverseCosTheta * Number.MAX_VALUE;
+
+        return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta, 
+            startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
+    }
+
+    private fireInternal(startX: number, startY: number, moveToX: number, moveToY: number) {
+        // Get bullet.
+        const bullet: Phaser.Sprite = this._bullets.getFirstDead();
+        bullet.angle = this._guntower.angle;
+        bullet.reset(startX, startY);
+
+        // bullet.body.angularVelocity = 5000;
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
+    }
+
+    private updateAsPuppetCore(gunAngle: number, tankAngle: number, position: Phaser.Point, firing: number, blood: number) {
         // if already gameover, do nothing.
         if (this._gameOver) {
             return;

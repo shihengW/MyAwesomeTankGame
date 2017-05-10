@@ -38,10 +38,9 @@ class TheGame {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
 
-        // Set-up world and bg.
+        // Set-up world bounds and view.
         this.game.world.setBounds(0, 0, GameWidth, GameHeight);
-        let graphics = this.game.add.graphics(0, 0);
-        DrawHelpers.drawGrids(graphics, GameWidth, GameHeight);
+        DrawHelpers.drawGrids(this.game.add.graphics(0, 0), GameWidth, GameHeight);
 
         // Set-up inputs.
         for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D, 
@@ -174,7 +173,7 @@ class TheGame {
 
     private static updateEnemyByJson(self: TheGame, enemy: Message) {
         let tank = TheGame.getOrAddEnemy(self, enemy);
-        tank.updateByJson(enemy)
+        tank.updateAsPuppet(enemy)
     }
 
     private static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
