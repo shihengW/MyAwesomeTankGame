@@ -48,8 +48,8 @@ class MiniMap {
         if (show || this._isBlinkingEnemy) {
             if (!this._show) {
                 this._show = true;
-                this._graphicsOuter.beginFill(0xFF3300, 0.3);
-                this._graphicsOuter.lineStyle(1, 0xFF3300, 0.3);
+                this._graphicsOuter.beginFill(0x4D5300, 0.5);
+                this._graphicsOuter.lineStyle(1, 0x4D5359, 0.5);
                 this._graphicsOuter.drawRect(this._offsets.x, this._offsets.y, this._bounds.x, this._bounds.y);
                 this._graphicsOuter.endFill();
             }
@@ -72,7 +72,7 @@ class MiniMap {
         }
         
         let spot = this.getPositionCore(x, y);
-        this._graphicsEnemy.lineStyle(4, 0x00AF00, 0.8);
+        this._graphicsEnemy.lineStyle(4, 0xAF0000, 0.8);
         this._graphicsEnemy.drawRect(spot.x, spot.y, 4, 4);
 
         let self = this;
