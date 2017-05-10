@@ -37,17 +37,20 @@ var MiniMap = (function () {
         this._bounds = new Phaser.Point(100, 80);
         this._offsets = new Phaser.Point(10, 10);
         this._show = false;
+        this._isBlinkingEnemy = false;
         this._graphicsOuter = game.add.graphics(this._offsets.x, this._offsets.y);
         this._graphicsPlayer = game.add.graphics(this._offsets.x, this._offsets.y);
+        this._graphicsEnemy = game.add.graphics(this._offsets.x, this._offsets.y);
         // This should not be affected by camera.
         this._graphicsOuter.fixedToCamera = true;
         this._graphicsPlayer.fixedToCamera = true;
+        this._graphicsEnemy.fixedToCamera = true;
         this._player = player;
         this._game = game;
     }
     MiniMap.prototype.updateMap = function (show) {
         this._graphicsPlayer.clear();
-        if (show) {
+        if (show || this._isBlinkingEnemy) {
             if (!this._show) {
                 this._show = true;
                 this._graphicsOuter.beginFill(0xFF3300, 0.3);
@@ -64,10 +67,25 @@ var MiniMap = (function () {
             this._graphicsOuter.clear();
         }
     };
+    MiniMap.prototype.blinkEnemy = function (x, y) {
+        this._isBlinkingEnemy = true;
+        if (!this._show) {
+            this.updateMap(true);
+        }
+        var spot = this.getPositionCore(x, y);
+        this._graphicsEnemy.lineStyle(4, 0x00AF00, 0.8);
+        this._graphicsEnemy.drawRect(spot.x, spot.y, 4, 4);
+        var self = this;
+        setTimeout(function () {
+            self._graphicsEnemy.clear();
+            self._isBlinkingEnemy = false;
+        }, 500);
+    };
+    MiniMap.prototype.getPositionCore = function (x, y) {
+        return new Phaser.Point(x / GameWidth * this._bounds.x + 10, y / GameHeight * this._bounds.y + 10);
+    };
     MiniMap.prototype.getPlayer = function () {
-        var x = (this._player.getBody()).position.x / GameWidth * this._bounds.x + 10;
-        var y = (this._player.getBody()).position.y / GameHeight * this._bounds.y + 10;
-        return new Phaser.Point(x, y);
+        return this.getPositionCore((this._player.getBody()).position.x, (this._player.getBody()).position.y);
     };
     return MiniMap;
 }());
@@ -195,6 +213,9 @@ var TheGame = (function () {
         // Update -> update.
         this._socket.on(tankUpdateGlobalEventName, function (player) {
             TheGame.updateEnemyByJson(self, player);
+            if (player.firing != undefined) {
+                self._miniMap.blinkEnemy(player.x, player.y);
+            }
         });
         this._socket.on(goneGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.

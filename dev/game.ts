@@ -72,6 +72,9 @@ class TheGame {
         // Update -> update.
         this._socket.on(tankUpdateGlobalEventName, function(player: Message) {
             TheGame.updateEnemyByJson(self, player);
+            if (player.firing != undefined) {
+                self._miniMap.blinkEnemy(player.x, player.y);
+            }
          });
 
         this._socket.on(goneGlobalEventName, function(player: Message) {
