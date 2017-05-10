@@ -149,7 +149,7 @@ var Joystick = (function () {
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 var TheGame = (function () {
     function TheGame() {
-        this.game = new Phaser.Game(window.screen.availWidth * window.devicePixelRatio, window.screen.availHeight * window.devicePixelRatio, Phaser.CANVAS, 'content', {
+        this.game = new Phaser.Game(window.innerWidth - 30 /*slideroffset*/, window.innerHeight - 30 /*slideroffset*/, Phaser.CANVAS, 'body', {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
