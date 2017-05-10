@@ -18,8 +18,8 @@ const hitEventName: string = "hit";
 const hitGlobalEventName: string = "hitGlobal";
 
 // Parameters  
-const FireRate: number = 300;
-const BulletSpeed: number = 700;
+const FireRate: number = 400;
+const BulletSpeed: number = 2000;
 const BloodTextOffset = 60;
 const Damage = 20;
 const MaxVelocity: number = 500;

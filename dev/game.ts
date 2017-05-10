@@ -44,7 +44,8 @@ class TheGame {
         DrawHelpers.drawGrids(graphics, GameWidth, GameHeight);
 
         // Set-up inputs.
-        for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D ]) {
+        for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D, 
+                          Phaser.Keyboard.UP, Phaser.Keyboard.LEFT, Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT ]) {
             TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
         }
 
@@ -54,6 +55,7 @@ class TheGame {
         let id = Math.ceil(Math.random() * 1000);
         this._player = new Tank(this.game, id, x, y);
         this.game.camera.follow(this._player.getBody());
+
         let deadzoneOffsetX = Math.abs(Math.floor(this.game.width / 2.3));
         let deadzoneOffsetY = Math.abs(Math.floor(this.game.height / 2.3));
         this.game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, 
@@ -181,10 +183,14 @@ class TheGame {
     private static mapKeyToDirection(key: any) : Directions {
         let direction: Directions = Directions.None;
         switch (key) {
-            case "w": direction = Directions.Up; break;
-            case "a": direction = Directions.Left; break;
-            case "s": direction = Directions.Down; break;
-            case "d": direction = Directions.Right; break;
+            case "w": 
+            case "ArrowUp": direction = Directions.Up; break;
+            case "a":
+            case "ArrowLeft": direction = Directions.Left; break;
+            case "s":
+            case "ArrowDown": direction = Directions.Down; break;
+            case "d":
+            case "ArrowRight": direction = Directions.Right; break;
         }
         return direction;
     }

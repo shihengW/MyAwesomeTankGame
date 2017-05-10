@@ -171,7 +171,8 @@ var TheGame = (function () {
         var graphics = this.game.add.graphics(0, 0);
         DrawHelpers.drawGrids(graphics, GameWidth, GameHeight);
         // Set-up inputs.
-        for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D]; _i < _a.length; _i++) {
+        for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D,
+            Phaser.Keyboard.UP, Phaser.Keyboard.LEFT, Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT]; _i < _a.length; _i++) {
             var key = _a[_i];
             TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
         }
@@ -296,15 +297,19 @@ var TheGame = (function () {
         var direction = Directions.None;
         switch (key) {
             case "w":
+            case "ArrowUp":
                 direction = Directions.Up;
                 break;
             case "a":
+            case "ArrowLeft":
                 direction = Directions.Left;
                 break;
             case "s":
+            case "ArrowDown":
                 direction = Directions.Down;
                 break;
             case "d":
+            case "ArrowRight":
                 direction = Directions.Right;
                 break;
         }
@@ -447,8 +452,8 @@ var goneGlobalEventName = "goneGlobal";
 var hitEventName = "hit";
 var hitGlobalEventName = "hitGlobal";
 // Parameters  
-var FireRate = 300;
-var BulletSpeed = 700;
+var FireRate = 400;
+var BulletSpeed = 2000;
 var BloodTextOffset = 60;
 var Damage = 20;
 var MaxVelocity = 500;
