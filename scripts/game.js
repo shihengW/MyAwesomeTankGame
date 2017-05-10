@@ -685,7 +685,7 @@ var Tank = (function () {
         // Get effect.
         var emitter = game.add.emitter(hitX, hitY);
         emitter.makeParticles(particleName, 0, 50, false, false);
-        emitter.explode(300, 50);
+        emitter.explode(1000, 50);
         return { hitX: hitX, hitY: hitY };
     };
     Tank.prototype.onHit = function (bullet) {
