@@ -1,4 +1,4 @@
-class Tank implements Shoot, Drive{   
+class Tank implements Shoot, Drive {   
     id: number;
     private _bloodText: Phaser.Text;
 
@@ -117,7 +117,7 @@ class Tank implements Shoot, Drive{
         this._bloodText.text = <string><any>this.blood;
     }
 
-    private getJson(firingTo: number) : Message {
+    getJson(firingTo: number) : Message {
         // If already died, just return an useless message.
         if (this._gameOver) {
             return {

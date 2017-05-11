@@ -10,6 +10,121 @@ var Directions;
     Directions[Directions["DownLeft"] = 12] = "DownLeft";
     Directions[Directions["DownRight"] = 20] = "DownRight";
 })(Directions || (Directions = {}));
+var Inputs = (function () {
+    function Inputs() {
+    }
+    Inputs.prototype.setupKeys = function (self) {
+        for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A,
+            Phaser.Keyboard.S, Phaser.Keyboard.D,
+            Phaser.Keyboard.UP, Phaser.Keyboard.LEFT,
+            Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT]; _i < _a.length; _i++) {
+            var key = _a[_i];
+            Inputs.registerKeyInputs(self, key, Inputs.prototype.onKeyDown, Inputs.prototype.onKeyUp);
+        }
+    };
+    Inputs.prototype.onKeyDown = function (e) {
+        var addDirection = Inputs.mapKeyToDirection(e.event.key);
+        MovementHelpers.addDirectionIntegral(this._player, addDirection);
+    };
+    Inputs.prototype.onKeyUp = function (e) {
+        var removeDirection = Inputs.mapKeyToDirection(e.event.key);
+        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
+    };
+    Inputs.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
+        var realKey = self.game.input.keyboard.addKey(key);
+        if (keydownHandler != null)
+            realKey.onDown.add(keydownHandler, self);
+        if (keyupHandler != null)
+            realKey.onUp.add(keyupHandler, self);
+    };
+    Inputs.mapKeyToDirection = function (key) {
+        var direction = Directions.None;
+        switch (key) {
+            case "w":
+            case "ArrowUp":
+                direction = Directions.Up;
+                break;
+            case "a":
+            case "ArrowLeft":
+                direction = Directions.Left;
+                break;
+            case "s":
+            case "ArrowDown":
+                direction = Directions.Down;
+                break;
+            case "d":
+            case "ArrowRight":
+                direction = Directions.Right;
+                break;
+        }
+        return direction;
+    };
+    return Inputs;
+}());
+var GameSocket = (function () {
+    function GameSocket() {
+    }
+    GameSocket.prototype.setupSocket = function (self) {
+        self._socket = io();
+        // Add new -> show.
+        self._socket.on(addNewGlobalEventName, function (player) {
+            TheGame.updateEnemyByJson(self, player);
+        });
+        // Update -> update.
+        self._socket.on(tankUpdateGlobalEventName, function (player) {
+            TheGame.updateEnemyByJson(self, player);
+            if (player.firing != undefined) {
+                self._miniMap.blinkEnemy(player.x, player.y);
+            }
+        });
+        self._socket.on(goneGlobalEventName, function (player) {
+            // If player has no blood, remove it from the list.
+            var tank = TheGame.removeEnemyByJson(self, player);
+            tank.explode();
+        });
+        self._socket.emit(addNewEventName, self._player.getJson(undefined));
+    };
+    GameSocket.getOrAddEnemy = function (self, enemy) {
+        var tank = undefined;
+        if (self._enemies == undefined) {
+            tank = new Tank(self.game, enemy.tankId, 0, 0);
+            self._enemies = [tank];
+        }
+        else {
+            var exist_1 = false;
+            self._enemies.forEach(function (item) {
+                if (enemy.tankId == item.id) {
+                    tank = item;
+                    exist_1 = true;
+                }
+            });
+            if (!exist_1) {
+                tank = new Tank(self.game, enemy.tankId, 0, 0);
+                self._enemies.push(tank);
+            }
+        }
+        return tank;
+    };
+    GameSocket.updateEnemyByJson = function (self, enemy) {
+        var tank = TheGame.getOrAddEnemy(self, enemy);
+        tank.updateAsPuppet(enemy);
+    };
+    GameSocket.removeEnemyByJson = function (self, enemy) {
+        // TODO: Refactor these ugly logic.
+        var foundTank = undefined;
+        self._enemies.forEach(function (item) {
+            if (enemy.tankId == item.id) {
+                foundTank = item;
+            }
+        });
+        var index = self._enemies.indexOf(foundTank);
+        if (index > -1) {
+            self._enemies.splice(index, 1);
+        }
+        return foundTank;
+    };
+    return GameSocket;
+}());
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
@@ -19,7 +134,6 @@ var TheGame = (function () {
             create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
         });
-        // this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.EXACT_FIT;
     }
     TheGame.prototype.preload = function () {
         this.game.load.image(sandbagName, "../resources/tank.png");
@@ -32,54 +146,13 @@ var TheGame = (function () {
     TheGame.prototype.create = function () {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        // Set-up world bounds and view.
-        this.game.world.setBounds(0, 0, GameWidth, GameHeight);
-        DrawHelpers.drawGrids(this.game.add.graphics(0, 0), GameWidth, GameHeight);
-        // Set-up inputs.
-        for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A,
-            Phaser.Keyboard.S, Phaser.Keyboard.D,
-            Phaser.Keyboard.UP, Phaser.Keyboard.LEFT,
-            Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT]; _i < _a.length; _i++) {
-            var key = _a[_i];
-            TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
-        }
-        // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
-        var x = Math.floor(GameWidth * Math.random());
-        var y = Math.floor(GameHeight * Math.random());
-        var id = Math.ceil(Math.random() * 1000);
-        this._player = new Tank(this.game, id, x, y);
-        this.game.camera.follow(this._player.getBody());
-        var deadzoneOffsetX = Math.abs(Math.floor(this.game.width / 2.3));
-        var deadzoneOffsetY = Math.abs(Math.floor(this.game.height / 2.3));
-        this.game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, this.game.width - deadzoneOffsetX * 2, this.game.height - deadzoneOffsetY * 2);
-        // Create socket, register events and tell the server
-        this._socket = io();
         var self = this;
-        // Add new -> show.
-        this._socket.on(addNewGlobalEventName, function (player) {
-            TheGame.updateEnemyByJson(self, player);
-        });
-        // Update -> update.
-        this._socket.on(tankUpdateGlobalEventName, function (player) {
-            TheGame.updateEnemyByJson(self, player);
-            if (player.firing != undefined) {
-                self._miniMap.blinkEnemy(player.x, player.y);
-            }
-        });
-        this._socket.on(goneGlobalEventName, function (player) {
-            // If player has no blood, remove it from the list.
-            var tank = TheGame.removeEnemyByJson(self, player);
-            tank.explode();
-        });
-        // Finally, let others know me.
-        this._socket.emit(addNewEventName, { tankId: id, x: x, y: y,
-            gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
-        // mini map.
-        this._miniMap = new MiniMap(this.game, this._player);
-        if (isMobile.any()) {
-            this._joystick = new Joystick(this.game);
-            this._joystick.drawJoystick();
-        }
+        // Set-up bg, player, socket, map, joystick.
+        TheGame.setupBackground(this.game);
+        TheGame.prototype.setupKeys(self);
+        TheGame.setupPlayer(self);
+        TheGame.prototype.setupSocket(self);
+        TheGame.setupForeground(self);
     };
     TheGame.prototype.update = function () {
         var _this = this;
@@ -108,85 +181,30 @@ var TheGame = (function () {
         // Finally, update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     };
-    // #region: privates.
-    TheGame.prototype.onKeyDown = function (e) {
-        var addDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelpers.addDirectionIntegral(this._player, addDirection);
+    TheGame.setupPlayer = function (self) {
+        var x = Math.floor(GameWidth * Math.random());
+        var y = Math.floor(GameHeight * Math.random());
+        var id = Math.ceil(Math.random() * 1000);
+        self._player = new Tank(self.game, id, x, y);
+        self.game.camera.follow(self._player._tankbody);
     };
-    TheGame.prototype.onKeyUp = function (e) {
-        var removeDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
+    TheGame.setupBackground = function (game) {
+        game.world.setBounds(0, 0, GameWidth, GameHeight);
+        DrawHelpers.drawGrids(game.add.graphics(0, 0), GameWidth, GameHeight);
+        var deadzoneOffsetX = Math.abs(Math.floor(game.width / 2.3));
+        var deadzoneOffsetY = Math.abs(Math.floor(game.height / 2.3));
+        game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, game.width - deadzoneOffsetX * 2, game.height - deadzoneOffsetY * 2);
     };
-    TheGame.removeEnemyByJson = function (self, enemy) {
-        // TODO: Refactor these ugly logic.
-        var foundTank = undefined;
-        self._enemies.forEach(function (item) {
-            if (enemy.tankId == item.id) {
-                foundTank = item;
-            }
-        });
-        var index = self._enemies.indexOf(foundTank);
-        if (index > -1) {
-            self._enemies.splice(index, 1);
+    TheGame.setupForeground = function (self) {
+        self._miniMap = new MiniMap(self.game, self._player);
+        if (isMobile.any()) {
+            self._joystick = new Joystick(self.game);
+            self._joystick.drawJoystick();
         }
-        return foundTank;
-    };
-    TheGame.getOrAddEnemy = function (self, enemy) {
-        var tank = undefined;
-        if (self._enemies == undefined) {
-            tank = new Tank(self.game, enemy.tankId, 0, 0);
-            self._enemies = [tank];
-        }
-        else {
-            var exist_1 = false;
-            self._enemies.forEach(function (item) {
-                if (enemy.tankId == item.id) {
-                    tank = item;
-                    exist_1 = true;
-                }
-            });
-            if (!exist_1) {
-                tank = new Tank(self.game, enemy.tankId, 0, 0);
-                self._enemies.push(tank);
-            }
-        }
-        return tank;
-    };
-    TheGame.updateEnemyByJson = function (self, enemy) {
-        var tank = TheGame.getOrAddEnemy(self, enemy);
-        tank.updateAsPuppet(enemy);
-    };
-    TheGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
-        var realKey = self.game.input.keyboard.addKey(key);
-        if (keydownHandler != null)
-            realKey.onDown.add(keydownHandler, self);
-        if (keyupHandler != null)
-            realKey.onUp.add(keyupHandler, self);
-    };
-    TheGame.mapKeyToDirection = function (key) {
-        var direction = Directions.None;
-        switch (key) {
-            case "w":
-            case "ArrowUp":
-                direction = Directions.Up;
-                break;
-            case "a":
-            case "ArrowLeft":
-                direction = Directions.Left;
-                break;
-            case "s":
-            case "ArrowDown":
-                direction = Directions.Down;
-                break;
-            case "d":
-            case "ArrowRight":
-                direction = Directions.Right;
-                break;
-        }
-        return direction;
     };
     return TheGame;
 }());
+applyMixins(TheGame, [GameSocket, Inputs]);
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 var DrawHelpers = (function () {
     function DrawHelpers() {

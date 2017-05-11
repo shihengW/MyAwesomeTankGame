@@ -1,5 +1,4 @@
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
-// TODO: Finish these logic when you have time.
 class MovementHelpers {
     static addDirectionIntegral(tank: Tank, addDirection: Directions) {
         let newDirection: Directions = MovementHelpers.addDirection(tank.direction, addDirection);
@@ -103,5 +102,3 @@ class MovementHelpers {
         maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
     }
 }
-
-/// ********************************************************** ///
