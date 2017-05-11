@@ -2,3 +2,4 @@
 window.onload = () => {
         var game = new TheGame();
 };
+

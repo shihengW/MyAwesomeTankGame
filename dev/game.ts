@@ -43,8 +43,10 @@ class TheGame {
         DrawHelpers.drawGrids(this.game.add.graphics(0, 0), GameWidth, GameHeight);
 
         // Set-up inputs.
-        for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D, 
-                          Phaser.Keyboard.UP, Phaser.Keyboard.LEFT, Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT ]) {
+        for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, 
+                          Phaser.Keyboard.S, Phaser.Keyboard.D, 
+                          Phaser.Keyboard.UP, Phaser.Keyboard.LEFT, 
+                          Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT ]) {
             TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
         }
 

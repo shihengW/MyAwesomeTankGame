@@ -10,6 +10,183 @@ var Directions;
     Directions[Directions["DownLeft"] = 12] = "DownLeft";
     Directions[Directions["DownRight"] = 20] = "DownRight";
 })(Directions || (Directions = {}));
+/// <reference path="../.ts_dependencies/pixi.d.ts" />
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
+/// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
+var TheGame = (function () {
+    function TheGame() {
+        this.game = new Phaser.Game(window.innerWidth - 30 /*slideroffset*/, window.innerHeight - 30 /*slideroffset*/, Phaser.CANVAS, 'body', {
+            create: this.create, preload: this.preload, update: this.update
+            // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
+        });
+        // this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.EXACT_FIT;
+    }
+    TheGame.prototype.preload = function () {
+        this.game.load.image(sandbagName, "../resources/tank.png");
+        this.game.load.image(bulletName, "../resources/bullet.png");
+        this.game.load.image(particleName, "../resources/particle.png");
+        this.game.load.image(tankbodyName, "../resources/tankbody.png");
+        this.game.load.image(guntowerName, "../resources/guntower.png");
+        this.game.stage.disableVisibilityChange = true;
+    };
+    TheGame.prototype.create = function () {
+        // Set-up physics.
+        this.game.physics.startSystem(Phaser.Physics.ARCADE);
+        // Set-up world bounds and view.
+        this.game.world.setBounds(0, 0, GameWidth, GameHeight);
+        DrawHelpers.drawGrids(this.game.add.graphics(0, 0), GameWidth, GameHeight);
+        // Set-up inputs.
+        for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A,
+            Phaser.Keyboard.S, Phaser.Keyboard.D,
+            Phaser.Keyboard.UP, Phaser.Keyboard.LEFT,
+            Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT]; _i < _a.length; _i++) {
+            var key = _a[_i];
+            TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
+        }
+        // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
+        var x = Math.floor(GameWidth * Math.random());
+        var y = Math.floor(GameHeight * Math.random());
+        var id = Math.ceil(Math.random() * 1000);
+        this._player = new Tank(this.game, id, x, y);
+        this.game.camera.follow(this._player.getBody());
+        var deadzoneOffsetX = Math.abs(Math.floor(this.game.width / 2.3));
+        var deadzoneOffsetY = Math.abs(Math.floor(this.game.height / 2.3));
+        this.game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, this.game.width - deadzoneOffsetX * 2, this.game.height - deadzoneOffsetY * 2);
+        // Create socket, register events and tell the server
+        this._socket = io();
+        var self = this;
+        // Add new -> show.
+        this._socket.on(addNewGlobalEventName, function (player) {
+            TheGame.updateEnemyByJson(self, player);
+        });
+        // Update -> update.
+        this._socket.on(tankUpdateGlobalEventName, function (player) {
+            TheGame.updateEnemyByJson(self, player);
+            if (player.firing != undefined) {
+                self._miniMap.blinkEnemy(player.x, player.y);
+            }
+        });
+        this._socket.on(goneGlobalEventName, function (player) {
+            // If player has no blood, remove it from the list.
+            var tank = TheGame.removeEnemyByJson(self, player);
+            tank.explode();
+        });
+        // Finally, let others know me.
+        this._socket.emit(addNewEventName, { tankId: id, x: x, y: y,
+            gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
+        // mini map.
+        this._miniMap = new MiniMap(this.game, this._player);
+        if (isMobile.any()) {
+            this._joystick = new Joystick(this.game);
+            this._joystick.drawJoystick();
+        }
+    };
+    TheGame.prototype.update = function () {
+        var _this = this;
+        var message = undefined;
+        // First, update tank itself.
+        if (this._joystick != undefined) {
+            var result = this._joystick.checkPointer();
+            if (this._player.direction != result.direction) {
+                this._player.drive(result.direction);
+            }
+            message = this._player.update(result.fire);
+        }
+        else {
+            message = this._player.update(this.game.input.activePointer.isDown);
+        }
+        this._socket.emit(tankUpdateEventName, message);
+        // Then, check collision.
+        if (this._enemies != undefined) {
+            this._enemies.forEach(function (enemy) {
+                var hitMessage = _this._player.combat(enemy);
+                if (hitMessage != undefined) {
+                    _this._socket.emit(hitEventName, hitMessage);
+                }
+            });
+        }
+        // Finally, update minimap.
+        this._miniMap.updateMap(this._player.direction != Directions.None);
+    };
+    // #region: privates.
+    TheGame.prototype.onKeyDown = function (e) {
+        var addDirection = TheGame.mapKeyToDirection(e.event.key);
+        MovementHelpers.addDirectionIntegral(this._player, addDirection);
+    };
+    TheGame.prototype.onKeyUp = function (e) {
+        var removeDirection = TheGame.mapKeyToDirection(e.event.key);
+        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
+    };
+    TheGame.removeEnemyByJson = function (self, enemy) {
+        // TODO: Refactor these ugly logic.
+        var foundTank = undefined;
+        self._enemies.forEach(function (item) {
+            if (enemy.tankId == item.id) {
+                foundTank = item;
+            }
+        });
+        var index = self._enemies.indexOf(foundTank);
+        if (index > -1) {
+            self._enemies.splice(index, 1);
+        }
+        return foundTank;
+    };
+    TheGame.getOrAddEnemy = function (self, enemy) {
+        var tank = undefined;
+        if (self._enemies == undefined) {
+            tank = new Tank(self.game, enemy.tankId, 0, 0);
+            self._enemies = [tank];
+        }
+        else {
+            var exist_1 = false;
+            self._enemies.forEach(function (item) {
+                if (enemy.tankId == item.id) {
+                    tank = item;
+                    exist_1 = true;
+                }
+            });
+            if (!exist_1) {
+                tank = new Tank(self.game, enemy.tankId, 0, 0);
+                self._enemies.push(tank);
+            }
+        }
+        return tank;
+    };
+    TheGame.updateEnemyByJson = function (self, enemy) {
+        var tank = TheGame.getOrAddEnemy(self, enemy);
+        tank.updateAsPuppet(enemy);
+    };
+    TheGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
+        var realKey = self.game.input.keyboard.addKey(key);
+        if (keydownHandler != null)
+            realKey.onDown.add(keydownHandler, self);
+        if (keyupHandler != null)
+            realKey.onUp.add(keyupHandler, self);
+    };
+    TheGame.mapKeyToDirection = function (key) {
+        var direction = Directions.None;
+        switch (key) {
+            case "w":
+            case "ArrowUp":
+                direction = Directions.Up;
+                break;
+            case "a":
+            case "ArrowLeft":
+                direction = Directions.Left;
+                break;
+            case "s":
+            case "ArrowDown":
+                direction = Directions.Down;
+                break;
+            case "d":
+            case "ArrowRight":
+                direction = Directions.Right;
+                break;
+        }
+        return direction;
+    };
+    return TheGame;
+}());
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 var DrawHelpers = (function () {
     function DrawHelpers() {
@@ -162,206 +339,6 @@ var Joystick = (function () {
     };
     return Joystick;
 }());
-/// <reference path="../.ts_dependencies/pixi.d.ts" />
-/// <reference path="../.ts_dependencies/phaser.d.ts" />
-/// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
-var TheGame = (function () {
-    function TheGame() {
-        this.game = new Phaser.Game(window.innerWidth - 30 /*slideroffset*/, window.innerHeight - 30 /*slideroffset*/, Phaser.CANVAS, 'body', {
-            create: this.create, preload: this.preload, update: this.update
-            // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
-        });
-        // this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.EXACT_FIT;
-    }
-    TheGame.prototype.preload = function () {
-        this.game.load.image(sandbagName, "../resources/tank.png");
-        this.game.load.image(bulletName, "../resources/bullet.png");
-        this.game.load.image(particleName, "../resources/particle.png");
-        this.game.load.image(tankbodyName, "../resources/tankbody.png");
-        this.game.load.image(guntowerName, "../resources/guntower.png");
-        this.game.stage.disableVisibilityChange = true;
-    };
-    TheGame.prototype.create = function () {
-        // Set-up physics.
-        this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        // Set-up world and bg.
-        this.game.world.setBounds(0, 0, GameWidth, GameHeight);
-        var graphics = this.game.add.graphics(0, 0);
-        DrawHelpers.drawGrids(graphics, GameWidth, GameHeight);
-        // Set-up inputs.
-        for (var _i = 0, _a = [Phaser.Keyboard.W, Phaser.Keyboard.A, Phaser.Keyboard.S, Phaser.Keyboard.D,
-            Phaser.Keyboard.UP, Phaser.Keyboard.LEFT, Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT]; _i < _a.length; _i++) {
-            var key = _a[_i];
-            TheGame.registerKeyInputs(this, key, TheGame.prototype.onKeyDown, TheGame.prototype.onKeyUp);
-        }
-        // Add player, give it an id and put it at random location. TODO: Let's pray there won't be equal Id.
-        var x = Math.floor(GameWidth * Math.random());
-        var y = Math.floor(GameHeight * Math.random());
-        var id = Math.ceil(Math.random() * 1000);
-        this._player = new Tank(this.game, id, x, y);
-        this.game.camera.follow(this._player.getBody());
-        var deadzoneOffsetX = Math.abs(Math.floor(this.game.width / 2.3));
-        var deadzoneOffsetY = Math.abs(Math.floor(this.game.height / 2.3));
-        this.game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, this.game.width - deadzoneOffsetX * 2, this.game.height - deadzoneOffsetY * 2);
-        // Create socket, register events and tell the server
-        this._socket = io();
-        var self = this;
-        // Add new -> show.
-        this._socket.on(addNewGlobalEventName, function (player) {
-            TheGame.updateEnemyByJson(self, player);
-        });
-        // Update -> update.
-        this._socket.on(tankUpdateGlobalEventName, function (player) {
-            TheGame.updateEnemyByJson(self, player);
-            if (player.firing != undefined) {
-                self._miniMap.blinkEnemy(player.x, player.y);
-            }
-        });
-        this._socket.on(goneGlobalEventName, function (player) {
-            // If player has no blood, remove it from the list.
-            var tank = TheGame.removeEnemyByJson(self, player);
-            tank.explode();
-        });
-        // Finally, let others know me.
-        this._socket.emit(addNewEventName, { tankId: id, x: x, y: y,
-            gunAngle: 0, tankAngle: 0, firing: undefined, blood: 100 });
-        // mini map.
-        this._miniMap = new MiniMap(this.game, this._player);
-        if (isMobile.any()) {
-            this._joystick = new Joystick(this.game);
-            this._joystick.drawJoystick();
-        }
-    };
-    TheGame.prototype.update = function () {
-        var _this = this;
-        var message = undefined;
-        // First, update tank itself.
-        if (this._joystick != undefined) {
-            var result = this._joystick.checkPointer();
-            if (this._player.direction != result.direction) {
-                this._player.drive(result.direction);
-            }
-            message = this._player.update(result.fire);
-        }
-        else {
-            message = this._player.update(this.game.input.activePointer.isDown);
-        }
-        this._socket.emit(tankUpdateEventName, message);
-        // Then, check collision.
-        if (this._enemies != undefined) {
-            this._enemies.forEach(function (enemy) {
-                var hitMessage = _this._player.combat(enemy);
-                if (hitMessage != undefined) {
-                    _this._socket.emit(hitEventName, hitMessage);
-                }
-            });
-        }
-        // Finally, update minimap.
-        this._miniMap.updateMap(this._player.direction != Directions.None);
-    };
-    // #region: privates.
-    TheGame.prototype.onKeyDown = function (e) {
-        var addDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelpers.addDirectionIntegral(this._player, addDirection);
-    };
-    TheGame.prototype.onKeyUp = function (e) {
-        var removeDirection = TheGame.mapKeyToDirection(e.event.key);
-        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
-    };
-    TheGame.removeEnemyByJson = function (self, enemy) {
-        // TODO: Refactor these ugly logic.
-        var foundTank = undefined;
-        self._enemies.forEach(function (item) {
-            if (enemy.tankId == item.id) {
-                foundTank = item;
-            }
-        });
-        var index = self._enemies.indexOf(foundTank);
-        if (index > -1) {
-            self._enemies.splice(index, 1);
-        }
-        return foundTank;
-    };
-    TheGame.getOrAddEnemy = function (self, enemy) {
-        var tank = undefined;
-        if (self._enemies == undefined) {
-            tank = new Tank(self.game, enemy.tankId, 0, 0);
-            self._enemies = [tank];
-        }
-        else {
-            var exist_1 = false;
-            self._enemies.forEach(function (item) {
-                if (enemy.tankId == item.id) {
-                    tank = item;
-                    exist_1 = true;
-                }
-            });
-            if (!exist_1) {
-                tank = new Tank(self.game, enemy.tankId, 0, 0);
-                self._enemies.push(tank);
-            }
-        }
-        return tank;
-    };
-    TheGame.updateEnemyByJson = function (self, enemy) {
-        var tank = TheGame.getOrAddEnemy(self, enemy);
-        tank.updateAsPuppet(enemy);
-    };
-    TheGame.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
-        var realKey = self.game.input.keyboard.addKey(key);
-        if (keydownHandler != null)
-            realKey.onDown.add(keydownHandler, self);
-        if (keyupHandler != null)
-            realKey.onUp.add(keyupHandler, self);
-    };
-    TheGame.mapKeyToDirection = function (key) {
-        var direction = Directions.None;
-        switch (key) {
-            case "w":
-            case "ArrowUp":
-                direction = Directions.Up;
-                break;
-            case "a":
-            case "ArrowLeft":
-                direction = Directions.Left;
-                break;
-            case "s":
-            case "ArrowDown":
-                direction = Directions.Down;
-                break;
-            case "d":
-            case "ArrowRight":
-                direction = Directions.Right;
-                break;
-        }
-        return direction;
-    };
-    return TheGame;
-}());
-var isMobile = {
-    Android: function () {
-        return navigator.userAgent.match(/Android/i);
-    },
-    BlackBerry: function () {
-        return navigator.userAgent.match(/BlackBerry/i);
-    },
-    iOS: function () {
-        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
-    },
-    Opera: function () {
-        return navigator.userAgent.match(/Opera Mini/i);
-    },
-    Windows: function () {
-        return navigator.userAgent.match(/IEMobile/i);
-    },
-    any: function () {
-        return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
-    }
-};
-/// *** Game main class *** ///
-window.onload = function () {
-    var game = new TheGame();
-};
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 // TODO: Finish these logic when you have time.
 var MovementHelpers = (function () {
@@ -455,6 +432,38 @@ var MovementHelpers = (function () {
     return MovementHelpers;
 }());
 /// ********************************************************** /// 
+function applyMixins(derivedCtor, baseCtors) {
+    baseCtors.forEach(function (baseCtor) {
+        Object.getOwnPropertyNames(baseCtor.prototype).forEach(function (name) {
+            derivedCtor.prototype[name] = baseCtor.prototype[name];
+        });
+    });
+}
+// TODO: Make it more like ts.
+var isMobile = {
+    Android: function () {
+        return navigator.userAgent.match(/Android/i);
+    },
+    BlackBerry: function () {
+        return navigator.userAgent.match(/BlackBerry/i);
+    },
+    iOS: function () {
+        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
+    },
+    Opera: function () {
+        return navigator.userAgent.match(/Opera Mini/i);
+    },
+    Windows: function () {
+        return navigator.userAgent.match(/IEMobile/i);
+    },
+    any: function () {
+        return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
+    }
+};
+/// *** Game main class *** ///
+window.onload = function () {
+    var game = new TheGame();
+};
 /// ****** names and parameters. ****** ///
 // Names
 var sandbagName = "sandbag";
@@ -485,9 +494,88 @@ var GridHeight = 50;
 var GridWidth = 90;
 var GameHeight = 5000;
 var GameWidth = 5000;
-// TODO: Should use group when figure out how
+var Drive = (function () {
+    function Drive() {
+        this.direction = Directions.None;
+        this._gameOver = false;
+    }
+    Drive.prototype.drive = function (d) {
+        if (this._gameOver) {
+            return;
+        }
+        this.direction = d;
+        if (d == Directions.None) {
+            this._tankbody.body.velocity.set(0, 0);
+            this._tankbody.body.acceleration.set(0, 0);
+            return;
+        }
+        var angle = MovementHelpers.directionToAngle(d);
+        this._tankbody.angle = angle;
+        MovementHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+    };
+    return Drive;
+}());
+var Shoot = (function () {
+    function Shoot() {
+        this.nextFireTime = 0;
+    }
+    Shoot.prototype.fire = function (firingTo) {
+        if (firingTo === void 0) { firingTo = undefined; }
+        if (!this.shouldFire(firingTo)) {
+            return undefined;
+        }
+        // Calculate the trajectory.
+        var trajectory = this.calculateTrajectory();
+        // Force set direction?
+        if (firingTo != undefined) {
+            trajectory.theta = firingTo;
+        }
+        // Fire.
+        this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
+        // Let's shake it shake it.
+        this._ownerGame.camera.shake(0.005, 50);
+        return trajectory.theta;
+    };
+    Shoot.prototype.shouldFire = function (firingTo) {
+        var result = firingTo != undefined
+            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
+        if (result) {
+            // Set time.
+            this.nextFireTime = this._ownerGame.time.now + FireRate;
+        }
+        return result;
+    };
+    Shoot.prototype.calculateTrajectory = function () {
+        // Get a random offset. I don't think I can support random offset since the current
+        // comm system cannot do the coordinate if there is a offset.
+        var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
+        var theta = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
+        // Set-up constants.
+        var halfLength = this._guntower.height / 2;
+        var sinTheta = Math.sin(theta);
+        var reverseCosTheta = -1 * Math.cos(theta);
+        var tankPosition = this._tankbody.body.center;
+        // Bullet start position and move to position.
+        var startX = sinTheta * halfLength + tankPosition.x;
+        var startY = reverseCosTheta * halfLength + tankPosition.y;
+        var moveToX = startX + sinTheta * Number.MAX_VALUE;
+        var moveToY = startY + reverseCosTheta * Number.MAX_VALUE;
+        return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
+            startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
+    };
+    Shoot.prototype.fireInternal = function (startX, startY, moveToX, moveToY) {
+        // Get bullet.
+        var bullet = this._bullets.getFirstDead();
+        bullet.angle = this._guntower.angle;
+        bullet.reset(startX, startY);
+        // bullet.body.angularVelocity = 5000;
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
+    };
+    return Shoot;
+}());
 var Tank = (function () {
     function Tank(game, id, x, y) {
+        // Mixin-Drive
         this.direction = Directions.None;
         this._gameOver = false;
         this.nextFireTime = 0;
@@ -502,9 +590,6 @@ var Tank = (function () {
         this._bloodText = tank.text;
         this._bullets = tank.bullets;
     }
-    Tank.prototype.getBody = function () {
-        return this._tankbody;
-    };
     Tank.prototype.update = function (shouldFire) {
         // If game over, do nothing.
         if (this._gameOver) {
@@ -522,20 +607,6 @@ var Tank = (function () {
     };
     Tank.prototype.updateAsPuppet = function (params) {
         this.updateAsPuppetCore(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
-    };
-    Tank.prototype.drive = function (d) {
-        if (this._gameOver) {
-            return;
-        }
-        this.direction = d;
-        if (d == Directions.None) {
-            this._tankbody.body.velocity.set(0, 0);
-            this._tankbody.body.acceleration.set(0, 0);
-            return;
-        }
-        var angle = MovementHelpers.directionToAngle(d);
-        this._tankbody.angle = angle;
-        MovementHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
     };
     Tank.prototype.combat = function (another) {
         var self = this;
@@ -562,6 +633,9 @@ var Tank = (function () {
     Tank.prototype.explode = function () {
         var self = this;
         Tank.onExplode(self);
+    };
+    Tank.prototype.getBody = function () {
+        return this._tankbody;
     };
     Tank.prototype.createTank = function (game, x, y) {
         var body = game.add.sprite(x, y, tankbodyName);
@@ -598,23 +672,6 @@ var Tank = (function () {
         this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + BloodTextOffset);
         this._bloodText.text = this.blood;
     };
-    Tank.prototype.fire = function (firingTo) {
-        if (firingTo === void 0) { firingTo = undefined; }
-        if (!this.shouldFire(firingTo)) {
-            return undefined;
-        }
-        // Calculate the trajectory.
-        var trajectory = this.calculateTrajectory();
-        // Force set direction?
-        if (firingTo != undefined) {
-            trajectory.theta = firingTo;
-        }
-        // Fire.
-        this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
-        // Let's shake it shake it.
-        this._ownerGame.camera.shake(0.005, 50);
-        return trajectory.theta;
-    };
     Tank.prototype.getJson = function (firingTo) {
         // If already died, just return an useless message.
         if (this._gameOver) {
@@ -637,41 +694,6 @@ var Tank = (function () {
             firing: firingTo,
             blood: this.blood
         };
-    };
-    Tank.prototype.shouldFire = function (firingTo) {
-        var result = firingTo != undefined
-            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
-        if (result) {
-            // Set time.
-            this.nextFireTime = this._ownerGame.time.now + FireRate;
-        }
-        return result;
-    };
-    Tank.prototype.calculateTrajectory = function () {
-        // Get a random offset. I don't think I can support random offset since the current
-        // comm system cannot do the coordinate if there is a offset.
-        var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
-        var theta = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
-        // Set-up constants.
-        var halfLength = this._guntower.height / 2;
-        var sinTheta = Math.sin(theta);
-        var reverseCosTheta = -1 * Math.cos(theta);
-        var tankPosition = this._tankbody.body.center;
-        // Bullet start position and move to position.
-        var startX = sinTheta * halfLength + tankPosition.x;
-        var startY = reverseCosTheta * halfLength + tankPosition.y;
-        var moveToX = startX + sinTheta * Number.MAX_VALUE;
-        var moveToY = startY + reverseCosTheta * Number.MAX_VALUE;
-        return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
-            startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
-    };
-    Tank.prototype.fireInternal = function (startX, startY, moveToX, moveToY) {
-        // Get bullet.
-        var bullet = this._bullets.getFirstDead();
-        bullet.angle = this._guntower.angle;
-        bullet.reset(startX, startY);
-        // bullet.body.angularVelocity = 5000;
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
     };
     Tank.prototype.updateAsPuppetCore = function (gunAngle, tankAngle, position, firing, blood) {
         // if already gameover, do nothing.
@@ -735,4 +757,5 @@ var Tank = (function () {
     };
     return Tank;
 }());
-/// ********************************************************** /// 
+// Set-up mixin.
+applyMixins(Tank, [Drive, Shoot]);

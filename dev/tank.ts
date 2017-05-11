@@ -1,10 +1,7 @@
-// TODO: Should use group when figure out how
-class Tank {
-    // Publics.
-    blood: number;
+class Tank implements Shoot, Drive{   
     id: number;
-    direction: Directions = Directions.None;
-    
+    private _bloodText: Phaser.Text;
+
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
         // Set-up basics.
         this._ownerGame = game;
@@ -17,10 +14,6 @@ class Tank {
         this._guntower = tank.gun;
         this._bloodText = tank.text;
         this._bullets = tank.bullets;
-    }
-
-    getBody() : Phaser.Sprite {
-        return this._tankbody;
     }
 
     update(shouldFire): Message {
@@ -41,24 +34,6 @@ class Tank {
 
     updateAsPuppet(params: Message) {
         this.updateAsPuppetCore(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
-    }
-
-    drive(d: Directions) {
-        if (this._gameOver) {
-            return;
-        }
-        
-        this.direction = d;
-
-        if (d == Directions.None) {
-            this._tankbody.body.velocity.set(0, 0);
-            this._tankbody.body.acceleration.set(0, 0);
-            return;
-        }
-        
-        let angle = MovementHelpers.directionToAngle(d);
-        this._tankbody.angle = angle;
-        MovementHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
     }
 
     combat(another: Tank) : HitMessage {
@@ -93,14 +68,10 @@ class Tank {
         let self = this;
         Tank.onExplode(self);
     }
-
-// #regions privates.
-    private _guntower: Phaser.Sprite;
-    private _tankbody: Phaser.Sprite;
-    private _bloodText: Phaser.Text;
-    private _bullets: Phaser.Group;
-    private _ownerGame: Phaser.Game;
-    private _gameOver: boolean = false;
+    
+    getBody() : Phaser.Sprite {
+        return this._tankbody;
+    }
 
     private createTank(game: Phaser.Game, x: number, y: number) : 
             { body: Phaser.Sprite, gun: Phaser.Sprite, text: Phaser.Text, bullets: Phaser.Group } {
@@ -146,27 +117,6 @@ class Tank {
         this._bloodText.text = <string><any>this.blood;
     }
 
-    private fire(firingTo: number = undefined) : number {
-        if (!this.shouldFire(firingTo)) {
-            return undefined;
-        }
-
-        // Calculate the trajectory.
-        let trajectory: Trajectory = this.calculateTrajectory();
-
-        // Force set direction?
-        if (firingTo != undefined) {
-            trajectory.theta = firingTo;
-        }
-        
-        // Fire.
-        this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
-
-        // Let's shake it shake it.
-        this._ownerGame.camera.shake(0.005, 50);
-        return trajectory.theta;
-    }
-
     private getJson(firingTo: number) : Message {
         // If already died, just return an useless message.
         if (this._gameOver) {
@@ -190,52 +140,6 @@ class Tank {
             firing: firingTo,
             blood: this.blood
         }
-    }
-
-    private nextFireTime: number = 0;
-
-    private shouldFire(firingTo: number): boolean {
-        let result = firingTo != undefined
-            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
-
-        if (result) {
-            // Set time.
-            this.nextFireTime = this._ownerGame.time.now + FireRate;
-        }
-
-        return result;
-    }
-
-    private calculateTrajectory(): Trajectory {
-        // Get a random offset. I don't think I can support random offset since the current
-        // comm system cannot do the coordinate if there is a offset.
-        const randomAngleOffset: number = (Math.random() - 0.5) * AngleOffsetBase;
-        const theta: number = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
-
-        // Set-up constants.
-        const halfLength: number = this._guntower.height / 2;
-        const sinTheta = Math.sin(theta);
-        const reverseCosTheta = -1 * Math.cos(theta);
-        const tankPosition = this._tankbody.body.center;
-
-        // Bullet start position and move to position.
-        let startX: number = sinTheta * halfLength + tankPosition.x;
-        let startY: number = reverseCosTheta * halfLength + tankPosition.y;
-        let moveToX: number = startX + sinTheta * Number.MAX_VALUE;
-        let moveToY: number = startY + reverseCosTheta * Number.MAX_VALUE;
-
-        return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta, 
-            startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
-    }
-
-    private fireInternal(startX: number, startY: number, moveToX: number, moveToY: number) {
-        // Get bullet.
-        const bullet: Phaser.Sprite = this._bullets.getFirstDead();
-        bullet.angle = this._guntower.angle;
-        bullet.reset(startX, startY);
-
-        // bullet.body.angularVelocity = 5000;
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
     }
 
     private updateAsPuppetCore(gunAngle: number, tankAngle: number, position: Phaser.Point, firing: number, blood: number) {
@@ -285,7 +189,7 @@ class Tank {
         self._bullets.destroy();
     }
 
-    private static onHitVisual(bullet: Phaser.Sprite, tankBody: Phaser.Sprite, game: Phaser.Game) : { hitX: number, hitY: number } {
+    static onHitVisual(bullet: Phaser.Sprite, tankBody: Phaser.Sprite, game: Phaser.Game) : { hitX: number, hitY: number } {
         // Now we are creating the particle emitter, centered to the world
         let hitX: number = (bullet.x + tankBody.body.x) / 2;
         let hitY: number =  (bullet.y + tankBody.body.y) / 2;
@@ -311,6 +215,27 @@ class Tank {
         }
     }
 
-// #endregion
+// Mixin-Drive
+    direction: Directions = Directions.None;
+    _tankbody: Phaser.Sprite;
+    _gameOver: boolean = false;
+    drive: (d: Directions) => void;
+// ----
+
+// Mixin-Fight
+    _bullets: Phaser.Group; 
+    _ownerGame: Phaser.Game;
+    _guntower: Phaser.Sprite;
+    blood: number;
+
+    fire: (firingTo: number) => number;
+    nextFireTime: number = 0;
+
+    shouldFire: (firingTo: number) => boolean;
+    calculateTrajectory: () => Trajectory;
+    fireInternal: (startX: number, startY: number, moveToX: number, moveToY: number) => void;
+// ----
 }
-/// ********************************************************** ///
+
+// Set-up mixin.
+applyMixins(Tank, [Drive, Shoot]);
