@@ -98,10 +98,10 @@ class Tank implements Shoot, Drive {
 
         bullets.setAll("checkWorldBounds", true);
         bullets.setAll("outOfBoundsKill", true);
-        bullets.forEachAlive((item:Phaser.Sprite) => { 
+        bullets.forEach((item:Phaser.Sprite) => { 
             item.body.bounce.set(0.1, 0.1);
-            item.anchor.set(0.5, 0.5);
-            item.body.mass = 0.1; }, this);
+            item.anchor.set(0.5, 1);
+            item.body.mass = 0.05; }, this);
         return { body: body, gun: gun, text: text, bullets: bullets};
     }
 
@@ -178,6 +178,11 @@ class Tank implements Shoot, Drive {
     }
 
     private static onExplode(self: Tank) {
+        // If already exploded, return.
+        if (self._tankbody.body == null) {
+            return;
+        }
+
         // Emit and destroy everything.
         let emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
         emitter.makeParticles(particleName, 0, 200, true, false);

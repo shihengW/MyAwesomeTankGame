@@ -18,7 +18,7 @@ class Shoot {
         }
         
         // Fire.
-        this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
+        this.fireInternal(trajectory.theta, trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
 
         // Let's shake it shake it.
         this._ownerGame.camera.shake(0.005, 50);
@@ -61,10 +61,10 @@ class Shoot {
             startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
     }
 
-    fireInternal(startX: number, startY: number, moveToX: number, moveToY: number) {
+    fireInternal(theta: number, startX: number, startY: number, moveToX: number, moveToY: number) {
         // Get bullet.
         const bullet: Phaser.Sprite = this._bullets.getFirstDead();
-        bullet.angle = this._guntower.angle;
+        bullet.rotation = theta;
         bullet.reset(startX, startY);
 
         // bullet.body.angularVelocity = 5000;

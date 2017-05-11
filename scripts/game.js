@@ -11,7 +11,7 @@ var Directions;
     Directions[Directions["DownRight"] = 20] = "DownRight";
 })(Directions || (Directions = {}));
 // Parameters  
-var FireRate = 400;
+var FireRate = 200;
 var BulletSpeed = 2000;
 var BloodTextOffset = 60;
 var Damage = 20;
@@ -28,6 +28,8 @@ var tankbodyName = "tankbody";
 var guntowerName = "guntower";
 var bulletName = "bullet";
 var particleName = "particle";
+var towerbodyName = "towerbody";
+var towershooter = "towershooter";
 // Socket-message names
 var tankUpdateEventName = "tankUpdate";
 var tankUpdateGlobalEventName = "tankUpdateGlobal";
@@ -232,6 +234,27 @@ var TheGame = (function () {
     return TheGame;
 }());
 applyMixins(TheGame, [GameSocket, Inputs]);
+var GunTower = (function () {
+    function GunTower(game, x, y) {
+        this.nextFireTime = 0;
+        this._ownerGame = game;
+        this._tower = game.add.sprite(x, y);
+        this._guntower = game.add.sprite(x, y);
+    }
+    GunTower.prototype.update = function (player) {
+        var enemies = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            enemies[_i - 1] = arguments[_i];
+        }
+    };
+    GunTower.prototype.collide = function (player) {
+        var enemies = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            enemies[_i - 1] = arguments[_i];
+        }
+    };
+    return GunTower;
+}());
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 var DrawHelpers = (function () {
     function DrawHelpers() {
@@ -519,7 +542,7 @@ var Shoot = (function () {
             trajectory.theta = firingTo;
         }
         // Fire.
-        this.fireInternal(trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
+        this.fireInternal(trajectory.theta, trajectory.startX, trajectory.startY, trajectory.moveToX, trajectory.moveToY);
         // Let's shake it shake it.
         this._ownerGame.camera.shake(0.005, 50);
         return trajectory.theta;
@@ -551,10 +574,10 @@ var Shoot = (function () {
         return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
             startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
     };
-    Shoot.prototype.fireInternal = function (startX, startY, moveToX, moveToY) {
+    Shoot.prototype.fireInternal = function (theta, startX, startY, moveToX, moveToY) {
         // Get bullet.
         var bullet = this._bullets.getFirstDead();
-        bullet.angle = this._guntower.angle;
+        bullet.rotation = theta;
         bullet.reset(startX, startY);
         // bullet.body.angularVelocity = 5000;
         this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
@@ -644,10 +667,10 @@ var Tank = (function () {
         bullets.createMultiple(50, bulletName);
         bullets.setAll("checkWorldBounds", true);
         bullets.setAll("outOfBoundsKill", true);
-        bullets.forEachAlive(function (item) {
+        bullets.forEach(function (item) {
             item.body.bounce.set(0.1, 0.1);
-            item.anchor.set(0.5, 0.5);
-            item.body.mass = 0.1;
+            item.anchor.set(0.5, 1);
+            item.body.mass = 0;
         }, this);
         return { body: body, gun: gun, text: text, bullets: bullets };
     };
@@ -712,6 +735,10 @@ var Tank = (function () {
         }
     };
     Tank.onExplode = function (self) {
+        // If already exploded, return.
+        if (self._tankbody.body == null) {
+            return;
+        }
         // Emit and destroy everything.
         var emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
         emitter.makeParticles(particleName, 0, 200, true, false);

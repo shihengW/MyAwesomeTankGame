@@ -1,5 +1,5 @@
 // Parameters  
-const FireRate: number = 400;
+const FireRate: number = 200;
 const BulletSpeed: number = 2000;
 const BloodTextOffset = 60;
 const Damage = 20;
@@ -17,6 +17,8 @@ const tankbodyName: string = "tankbody";
 const guntowerName: string = "guntower";
 const bulletName: string = "bullet";
 const particleName: string = "particle";
+const towerbodyName: string = "towerbody";
+const towershooter: string = "towershooter";
 
 // Socket-message names
 const tankUpdateEventName: string = "tankUpdate";
