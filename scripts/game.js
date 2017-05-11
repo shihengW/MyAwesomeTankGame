@@ -10,6 +10,33 @@ var Directions;
     Directions[Directions["DownLeft"] = 12] = "DownLeft";
     Directions[Directions["DownRight"] = 20] = "DownRight";
 })(Directions || (Directions = {}));
+// Parameters  
+var FireRate = 400;
+var BulletSpeed = 2000;
+var BloodTextOffset = 60;
+var Damage = 20;
+var MaxVelocity = 500;
+var Acceleration = 300;
+var AngleOffsetBase = 0.1 * Math.PI; // degree.
+var GridHeight = 50;
+var GridWidth = 90;
+var GameHeight = 5000;
+var GameWidth = 5000;
+// Names
+var sandbagName = "sandbag";
+var tankbodyName = "tankbody";
+var guntowerName = "guntower";
+var bulletName = "bullet";
+var particleName = "particle";
+// Socket-message names
+var tankUpdateEventName = "tankUpdate";
+var tankUpdateGlobalEventName = "tankUpdateGlobal";
+var addNewEventName = "addNew";
+var addNewGlobalEventName = "addNewGlobal";
+var goneEventName = "gone";
+var goneGlobalEventName = "goneGlobal";
+var hitEventName = "hit";
+var hitGlobalEventName = "hitGlobal";
 var Inputs = (function () {
     function Inputs() {
     }
@@ -24,11 +51,11 @@ var Inputs = (function () {
     };
     Inputs.prototype.onKeyDown = function (e) {
         var addDirection = Inputs.mapKeyToDirection(e.event.key);
-        MovementHelpers.addDirectionIntegral(this._player, addDirection);
+        DriveHelpers.addDirectionIntegral(this._player, addDirection);
     };
     Inputs.prototype.onKeyUp = function (e) {
         var removeDirection = Inputs.mapKeyToDirection(e.event.key);
-        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
+        DriveHelpers.removeDirectionIntegral(this._player, removeDirection);
     };
     Inputs.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
         var realKey = self.game.input.keyboard.addKey(key);
@@ -68,18 +95,18 @@ var GameSocket = (function () {
         self._socket = io();
         // Add new -> show.
         self._socket.on(addNewGlobalEventName, function (player) {
-            TheGame.updateEnemyByJson(self, player);
+            GameSocket.updateEnemyByJson(self, player);
         });
         // Update -> update.
         self._socket.on(tankUpdateGlobalEventName, function (player) {
-            TheGame.updateEnemyByJson(self, player);
+            GameSocket.updateEnemyByJson(self, player);
             if (player.firing != undefined) {
                 self._miniMap.blinkEnemy(player.x, player.y);
             }
         });
         self._socket.on(goneGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
-            var tank = TheGame.removeEnemyByJson(self, player);
+            var tank = GameSocket.removeEnemyByJson(self, player);
             tank.explode();
         });
         self._socket.emit(addNewEventName, self._player.getJson(undefined));
@@ -106,7 +133,7 @@ var GameSocket = (function () {
         return tank;
     };
     GameSocket.updateEnemyByJson = function (self, enemy) {
-        var tank = TheGame.getOrAddEnemy(self, enemy);
+        var tank = GameSocket.getOrAddEnemy(self, enemy);
         tank.updateAsPuppet(enemy);
     };
     GameSocket.removeEnemyByJson = function (self, enemy) {
@@ -358,42 +385,18 @@ var Joystick = (function () {
     return Joystick;
 }());
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
-// TODO: Finish these logic when you have time.
-var MovementHelpers = (function () {
-    function MovementHelpers() {
+var DriveHelpers = (function () {
+    function DriveHelpers() {
     }
-    MovementHelpers.addDirectionIntegral = function (tank, addDirection) {
-        var newDirection = MovementHelpers.addDirection(tank.direction, addDirection);
+    DriveHelpers.addDirectionIntegral = function (tank, addDirection) {
+        var newDirection = DriveHelpers.addDirection(tank.direction, addDirection);
         tank.drive(newDirection);
     };
-    MovementHelpers.removeDirectionIntegral = function (tank, removeDirection) {
-        var newDirection = MovementHelpers.removeDirection(tank.direction, removeDirection);
+    DriveHelpers.removeDirectionIntegral = function (tank, removeDirection) {
+        var newDirection = DriveHelpers.removeDirection(tank.direction, removeDirection);
         tank.drive(newDirection);
     };
-    MovementHelpers.addDirection = function (direction, addDirection) {
-        // If direction alread has the added direction, just return. This case may barely happen.
-        if ((direction & addDirection) != 0) {
-            return Directions.None;
-        }
-        var opsiteDirection = MovementHelpers.getOpsiteDirection(addDirection);
-        if ((direction & opsiteDirection) != 0) {
-            return direction = direction & (~opsiteDirection);
-        }
-        return direction | addDirection;
-    };
-    MovementHelpers.removeDirection = function (direction, removeDirection) {
-        return direction & (~removeDirection);
-    };
-    MovementHelpers.getOpsiteDirection = function (direction) {
-        switch (direction) {
-            case Directions.Up: return Directions.Down;
-            case Directions.Down: return Directions.Up;
-            case Directions.Left: return Directions.Right;
-            case Directions.Right: return Directions.Left;
-        }
-        return Directions.None;
-    };
-    MovementHelpers.directionToAngle = function (direction) {
+    DriveHelpers.directionToAngle = function (direction) {
         switch (direction) {
             case Directions.Up:
                 return 0;
@@ -415,41 +418,38 @@ var MovementHelpers = (function () {
                 return undefined;
         }
     };
-    MovementHelpers.directionToRotation = function (direction) {
-        if (direction == Directions.None) {
-            return undefined;
+    DriveHelpers.addDirection = function (direction, addDirection) {
+        // If direction alread has the added direction, just return. This case may barely happen.
+        if ((direction & addDirection) != 0) {
+            return Directions.None;
         }
-        var angle = MovementHelpers.directionToAngle(direction);
-        return Phaser.Math.degToRad(angle);
-    };
-    MovementHelpers.directionToSpeed = function (direction) {
-        if (direction == Directions.None) {
-            return { x: 0, y: 0 };
+        var opsiteDirection = DriveHelpers.getOpsiteDirection(addDirection);
+        if ((direction & opsiteDirection) != 0) {
+            return direction = direction & (~opsiteDirection);
         }
-        var angle = MovementHelpers.directionToAngle(direction);
-        return MovementHelpers.angleToSpeed(angle);
+        return direction | addDirection;
     };
-    MovementHelpers.angleToSpeed = function (angle) {
-        if (angle == undefined) {
-            return { x: 0, y: 0 };
+    DriveHelpers.removeDirection = function (direction, removeDirection) {
+        return direction & (~removeDirection);
+    };
+    DriveHelpers.getOpsiteDirection = function (direction) {
+        switch (direction) {
+            case Directions.Up: return Directions.Down;
+            case Directions.Down: return Directions.Up;
+            case Directions.Left: return Directions.Right;
+            case Directions.Right: return Directions.Left;
         }
-        var angleRad = Phaser.Math.degToRad(angle);
-        return { x: Math.sin(angleRad) * MaxVelocity, y: 0 - Math.cos(angleRad) * MaxVelocity };
+        return Directions.None;
     };
-    MovementHelpers.stop = function (acceleration, speed) {
-        acceleration.setTo(0, 0);
-        speed.setTo(0, 0);
-    };
-    MovementHelpers.angleToAcceleration = function (angle, acceleration, maxVelocity) {
+    DriveHelpers.angleToAcceleration = function (angle, acceleration, maxVelocity) {
         var angleRad = Phaser.Math.degToRad(angle);
         var sinAngle = Math.sin(angleRad);
         var negCosAngle = 0 - Math.cos(angleRad);
         acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
         maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
     };
-    return MovementHelpers;
+    return DriveHelpers;
 }());
-/// ********************************************************** /// 
 function applyMixins(derivedCtor, baseCtors) {
     baseCtors.forEach(function (baseCtor) {
         Object.getOwnPropertyNames(baseCtor.prototype).forEach(function (name) {
@@ -478,40 +478,6 @@ var isMobile = {
         return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
     }
 };
-/// *** Game main class *** ///
-window.onload = function () {
-    var game = new TheGame();
-};
-/// ****** names and parameters. ****** ///
-// Names
-var sandbagName = "sandbag";
-var tankbodyName = "tankbody";
-var guntowerName = "guntower";
-var bulletName = "bullet";
-var particleName = "particle";
-// Comm names
-// just a notify.
-var tankUpdateEventName = "tankUpdate";
-var tankUpdateGlobalEventName = "tankUpdateGlobal";
-var addNewEventName = "addNew";
-var addNewGlobalEventName = "addNewGlobal";
-var goneEventName = "gone";
-var goneGlobalEventName = "goneGlobal";
-var hitEventName = "hit";
-var hitGlobalEventName = "hitGlobal";
-// Parameters  
-var FireRate = 400;
-var BulletSpeed = 2000;
-var BloodTextOffset = 60;
-var Damage = 20;
-var MaxVelocity = 500;
-var Acceleration = 300;
-var AngleOffsetBase = 0.1 * Math.PI; // degree.
-// background
-var GridHeight = 50;
-var GridWidth = 90;
-var GameHeight = 5000;
-var GameWidth = 5000;
 var Drive = (function () {
     function Drive() {
         this.direction = Directions.None;
@@ -527,9 +493,9 @@ var Drive = (function () {
             this._tankbody.body.acceleration.set(0, 0);
             return;
         }
-        var angle = MovementHelpers.directionToAngle(d);
+        var angle = DriveHelpers.directionToAngle(d);
         this._tankbody.angle = angle;
-        MovementHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        DriveHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
     };
     return Drive;
 }());

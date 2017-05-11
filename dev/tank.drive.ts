@@ -16,8 +16,8 @@ class Drive {
             return;
         }
         
-        let angle = MovementHelpers.directionToAngle(d);
+        let angle = DriveHelpers.directionToAngle(d);
         this._tankbody.angle = angle;
-        MovementHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        DriveHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
     }
 }

@@ -6,12 +6,12 @@ class GameSocket {
         self._socket = io();
         // Add new -> show.
         self._socket.on(addNewGlobalEventName, function(player: Message) {
-            TheGame.updateEnemyByJson(self, player);
+            GameSocket.updateEnemyByJson(self, player);
         });
 
         // Update -> update.
         self._socket.on(tankUpdateGlobalEventName, function(player: Message) {
-            TheGame.updateEnemyByJson(self, player);
+            GameSocket.updateEnemyByJson(self, player);
             if (player.firing != undefined) {
                 self._miniMap.blinkEnemy(player.x, player.y);
             }
@@ -19,7 +19,7 @@ class GameSocket {
 
         self._socket.on(goneGlobalEventName, function(player: Message) {
             // If player has no blood, remove it from the list.
-            let tank = TheGame.removeEnemyByJson(self, player);
+            let tank = GameSocket.removeEnemyByJson(self, player);
             tank.explode();
         });
 
@@ -49,7 +49,7 @@ class GameSocket {
     }
 
     static updateEnemyByJson(self: TheGame, enemy: Message) {
-        let tank = TheGame.getOrAddEnemy(self, enemy);
+        let tank = GameSocket.getOrAddEnemy(self, enemy);
         tank.updateAsPuppet(enemy)
     }
 

@@ -92,7 +92,6 @@ class MiniMap {
 }
 
 class Joystick {
-
     private _game: Phaser.Game;
     private _r: number = 200;
     private _center: Phaser.Point;

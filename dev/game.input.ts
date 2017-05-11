@@ -12,12 +12,12 @@ class Inputs {
 
     onKeyDown(e: Phaser.Key) {
         let addDirection = Inputs.mapKeyToDirection(e.event.key);
-        MovementHelpers.addDirectionIntegral(this._player, addDirection);
+        DriveHelpers.addDirectionIntegral(this._player, addDirection);
     }
 
     onKeyUp(e: Phaser.Key) {
         let removeDirection = Inputs.mapKeyToDirection(e.event.key);
-        MovementHelpers.removeDirectionIntegral(this._player, removeDirection);
+        DriveHelpers.removeDirectionIntegral(this._player, removeDirection);
     }
     
     static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
