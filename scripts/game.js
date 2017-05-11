@@ -224,7 +224,7 @@ var TheGame = (function () {
     };
     TheGame.setupForeground = function (self) {
         self._miniMap = new MiniMap(self.game, self._player);
-        if (isMobile.any()) {
+        if (MobileChecker.isMobile()) {
             self._joystick = new Joystick(self.game);
             self._joystick.drawJoystick();
         }
@@ -458,26 +458,30 @@ function applyMixins(derivedCtor, baseCtors) {
     });
 }
 // TODO: Make it more like ts.
-var isMobile = {
-    Android: function () {
-        return navigator.userAgent.match(/Android/i);
-    },
-    BlackBerry: function () {
-        return navigator.userAgent.match(/BlackBerry/i);
-    },
-    iOS: function () {
-        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
-    },
-    Opera: function () {
-        return navigator.userAgent.match(/Opera Mini/i);
-    },
-    Windows: function () {
-        return navigator.userAgent.match(/IEMobile/i);
-    },
-    any: function () {
-        return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
+var MobileChecker = (function () {
+    function MobileChecker() {
     }
-};
+    MobileChecker.Android = function () {
+        return navigator.userAgent.match(/Android/i);
+    };
+    MobileChecker.BlackBerry = function () {
+        return navigator.userAgent.match(/BlackBerry/i);
+    };
+    MobileChecker.iOS = function () {
+        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
+    };
+    MobileChecker.Opera = function () {
+        return navigator.userAgent.match(/Opera Mini/i);
+    };
+    MobileChecker.Windows = function () {
+        return navigator.userAgent.match(/IEMobile/i);
+    };
+    MobileChecker.isMobile = function () {
+        return (MobileChecker.Android() || MobileChecker.BlackBerry() || MobileChecker.iOS() || MobileChecker.Opera() || MobileChecker.Windows());
+    };
+    return MobileChecker;
+}());
+;
 var Drive = (function () {
     function Drive() {
         this.direction = Directions.None;

@@ -7,23 +7,28 @@ function applyMixins(derivedCtor: any, baseCtors: any[]) {
 }
 
 // TODO: Make it more like ts.
-var isMobile = {
-    Android: function() {
+class MobileChecker {
+    private static Android() : RegExpMatchArray {
         return navigator.userAgent.match(/Android/i);
-    },
-    BlackBerry: function() {
+    }
+
+    private static BlackBerry() : RegExpMatchArray {
         return navigator.userAgent.match(/BlackBerry/i);
-    },
-    iOS: function() {
+    }
+
+    private static iOS() : RegExpMatchArray {
         return navigator.userAgent.match(/iPhone|iPad|iPod/i);
-    },
-    Opera: function() {
+    }
+
+    private static Opera() : RegExpMatchArray {
         return navigator.userAgent.match(/Opera Mini/i);
-    },
-    Windows: function() {
+    }
+
+    private static Windows() : RegExpMatchArray {
         return navigator.userAgent.match(/IEMobile/i);
-    },
-    any: function() {
-        return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
+    }
+
+    static isMobile() : RegExpMatchArray {
+        return (MobileChecker.Android() || MobileChecker.BlackBerry() || MobileChecker.iOS() || MobileChecker.Opera() || MobileChecker.Windows());
     }
 };

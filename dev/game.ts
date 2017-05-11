@@ -87,7 +87,7 @@ class TheGame implements GameSocket, Inputs {
 
     static setupForeground(self: TheGame) {
         self._miniMap = new MiniMap(self.game, self._player);
-        if (isMobile.any()) {
+        if (MobileChecker.isMobile()) {
             self._joystick = new Joystick(self.game);
             self._joystick.drawJoystick();
         }
