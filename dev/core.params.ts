@@ -12,20 +12,20 @@ const GameHeight = 5000;
 const GameWidth = 5000;
 
 // Names
-const sandbagName: string = "sandbag";
-const tankbodyName: string = "tankbody";
-const guntowerName: string = "guntower";
-const bulletName: string = "bullet";
-const particleName: string = "particle";
-const towerbodyName: string = "towerbody";
-const towershooter: string = "towershooter";
+const SandbagName: string = "sandbag";
+const TankbodyName: string = "tankbody";
+const GuntowerName: string = "guntower";
+const BulletName: string = "bullet";
+const ParticleName: string = "particle";
+const TowerbodyName: string = "towerbody";
+const TowershooterName: string = "towershooter";
 
 // Socket-message names
-const tankUpdateEventName: string = "tankUpdate";
-const tankUpdateGlobalEventName: string = "tankUpdateGlobal";
-const addNewEventName: string = "addNew";
-const addNewGlobalEventName: string = "addNewGlobal";
-const goneEventName: string = "gone";
-const goneGlobalEventName: string = "goneGlobal";
-const hitEventName: string = "hit";
-const hitGlobalEventName: string = "hitGlobal";
+const TankUpdateEventName: string = "tankUpdate";
+const TankUpdateGlobalEventName: string = "tankUpdateGlobal";
+const AddNewEventName: string = "addNew";
+const AddNewGlobalEventName: string = "addNewGlobal";
+const GoneEventName: string = "gone";
+const GoneGlobalEventName: string = "goneGlobal";
+const HitEventName: string = "hit";
+const HitGlobalEventName: string = "hitGlobal";

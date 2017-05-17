@@ -75,8 +75,8 @@ class Tank implements Shoot, Drive {
 
     private createTank(game: Phaser.Game, x: number, y: number) : 
             { body: Phaser.Sprite, gun: Phaser.Sprite, text: Phaser.Text, bullets: Phaser.Group } {
-        let body = game.add.sprite(x, y, tankbodyName);
-        let gun = game.add.sprite(x, y, guntowerName);
+        let body = game.add.sprite(x, y, TankbodyName);
+        let gun = game.add.sprite(x, y, GuntowerName);
         let text = game.add.text(x, y - BloodTextOffset, <string><any>(this.blood), 
                     { font: "20px Arial", fill: "#00A000", align: "center" });
 
@@ -94,7 +94,7 @@ class Tank implements Shoot, Drive {
         let bullets = game.add.group();
         bullets.enableBody = true;
         bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        bullets.createMultiple(50, bulletName);
+        bullets.createMultiple(50, BulletName);
 
         bullets.setAll("checkWorldBounds", true);
         bullets.setAll("outOfBoundsKill", true);
@@ -185,7 +185,7 @@ class Tank implements Shoot, Drive {
 
         // Emit and destroy everything.
         let emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
-        emitter.makeParticles(particleName, 0, 200, true, false);
+        emitter.makeParticles(ParticleName, 0, 200, true, false);
         emitter.explode(2000, 200);
         
         self._tankbody.destroy();
@@ -202,7 +202,7 @@ class Tank implements Shoot, Drive {
 
         // Get effect.
         let emitter = game.add.emitter(hitX, hitY);
-        emitter.makeParticles(particleName, 0, 50, false, false);
+        emitter.makeParticles(ParticleName, 0, 50, false, false);
         emitter.explode(1000, 50);
         return { hitX: hitX, hitY: hitY };
     }

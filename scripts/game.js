@@ -23,22 +23,27 @@ var GridWidth = 90;
 var GameHeight = 5000;
 var GameWidth = 5000;
 // Names
-var sandbagName = "sandbag";
-var tankbodyName = "tankbody";
-var guntowerName = "guntower";
-var bulletName = "bullet";
-var particleName = "particle";
-var towerbodyName = "towerbody";
-var towershooter = "towershooter";
+var SandbagName = "sandbag";
+var TankbodyName = "tankbody";
+var GuntowerName = "guntower";
+var BulletName = "bullet";
+var ParticleName = "particle";
+var TowerbodyName = "towerbody";
+var TowershooterName = "towershooter";
 // Socket-message names
-var tankUpdateEventName = "tankUpdate";
-var tankUpdateGlobalEventName = "tankUpdateGlobal";
-var addNewEventName = "addNew";
-var addNewGlobalEventName = "addNewGlobal";
-var goneEventName = "gone";
-var goneGlobalEventName = "goneGlobal";
-var hitEventName = "hit";
-var hitGlobalEventName = "hitGlobal";
+var TankUpdateEventName = "tankUpdate";
+var TankUpdateGlobalEventName = "tankUpdateGlobal";
+var AddNewEventName = "addNew";
+var AddNewGlobalEventName = "addNewGlobal";
+var GoneEventName = "gone";
+var GoneGlobalEventName = "goneGlobal";
+var HitEventName = "hit";
+var HitGlobalEventName = "hitGlobal";
+var Combat = (function () {
+    function Combat() {
+    }
+    return Combat;
+}());
 var Inputs = (function () {
     function Inputs() {
     }
@@ -96,22 +101,22 @@ var GameSocket = (function () {
     GameSocket.prototype.setupSocket = function (self) {
         self._socket = io();
         // Add new -> show.
-        self._socket.on(addNewGlobalEventName, function (player) {
+        self._socket.on(AddNewGlobalEventName, function (player) {
             GameSocket.updateEnemyByJson(self, player);
         });
         // Update -> update.
-        self._socket.on(tankUpdateGlobalEventName, function (player) {
+        self._socket.on(TankUpdateGlobalEventName, function (player) {
             GameSocket.updateEnemyByJson(self, player);
             if (player.firing != undefined) {
                 self._miniMap.blinkEnemy(player.x, player.y);
             }
         });
-        self._socket.on(goneGlobalEventName, function (player) {
+        self._socket.on(GoneGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
             var tank = GameSocket.removeEnemyByJson(self, player);
             tank.explode();
         });
-        self._socket.emit(addNewEventName, self._player.getJson(undefined));
+        self._socket.emit(AddNewEventName, self._player.getJson(undefined));
     };
     GameSocket.getOrAddEnemy = function (self, enemy) {
         var tank = undefined;
@@ -160,23 +165,23 @@ var GameSocket = (function () {
 var TheGame = (function () {
     function TheGame() {
         this.game = new Phaser.Game(window.innerWidth - 30 /*slideroffset*/, window.innerHeight - 30 /*slideroffset*/, Phaser.CANVAS, 'body', {
-            create: this.create, preload: this.preload, update: this.update
             // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
+            create: this.create, preload: this.preload, update: this.update
         });
     }
     TheGame.prototype.preload = function () {
-        this.game.load.image(sandbagName, "../resources/tank.png");
-        this.game.load.image(bulletName, "../resources/bullet.png");
-        this.game.load.image(particleName, "../resources/particle.png");
-        this.game.load.image(tankbodyName, "../resources/tankbody.png");
-        this.game.load.image(guntowerName, "../resources/guntower.png");
+        this.game.load.image(SandbagName, "../resources/tank.png");
+        this.game.load.image(BulletName, "../resources/bullet.png");
+        this.game.load.image(ParticleName, "../resources/particle.png");
+        this.game.load.image(TankbodyName, "../resources/tankbody.png");
+        this.game.load.image(GuntowerName, "../resources/guntower.png");
         this.game.stage.disableVisibilityChange = true;
     };
     TheGame.prototype.create = function () {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        var self = this;
         // Set-up bg, player, socket, map, joystick.
+        var self = this;
         TheGame.setupBackground(this.game);
         TheGame.prototype.setupKeys(self);
         TheGame.setupPlayer(self);
@@ -197,13 +202,13 @@ var TheGame = (function () {
         else {
             message = this._player.update(this.game.input.activePointer.isDown);
         }
-        this._socket.emit(tankUpdateEventName, message);
+        this._socket.emit(TankUpdateEventName, message);
         // Then, check collision.
         if (this._enemies != undefined) {
             this._enemies.forEach(function (enemy) {
                 var hitMessage = _this._player.combat(enemy);
                 if (hitMessage != undefined) {
-                    _this._socket.emit(hitEventName, hitMessage);
+                    _this._socket.emit(HitEventName, hitMessage);
                 }
             });
         }
@@ -649,8 +654,8 @@ var Tank = (function () {
         return this._tankbody;
     };
     Tank.prototype.createTank = function (game, x, y) {
-        var body = game.add.sprite(x, y, tankbodyName);
-        var gun = game.add.sprite(x, y, guntowerName);
+        var body = game.add.sprite(x, y, TankbodyName);
+        var gun = game.add.sprite(x, y, GuntowerName);
         var text = game.add.text(x, y - BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
         body.anchor.set(0.5, 0.5);
         gun.anchor.set(0.5, 0.5);
@@ -664,13 +669,13 @@ var Tank = (function () {
         var bullets = game.add.group();
         bullets.enableBody = true;
         bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        bullets.createMultiple(50, bulletName);
+        bullets.createMultiple(50, BulletName);
         bullets.setAll("checkWorldBounds", true);
         bullets.setAll("outOfBoundsKill", true);
         bullets.forEach(function (item) {
             item.body.bounce.set(0.1, 0.1);
             item.anchor.set(0.5, 1);
-            item.body.mass = 0;
+            item.body.mass = 0.05;
         }, this);
         return { body: body, gun: gun, text: text, bullets: bullets };
     };
@@ -741,7 +746,7 @@ var Tank = (function () {
         }
         // Emit and destroy everything.
         var emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
-        emitter.makeParticles(particleName, 0, 200, true, false);
+        emitter.makeParticles(ParticleName, 0, 200, true, false);
         emitter.explode(2000, 200);
         self._tankbody.destroy();
         self._guntower.destroy();
@@ -755,7 +760,7 @@ var Tank = (function () {
         bullet.kill();
         // Get effect.
         var emitter = game.add.emitter(hitX, hitY);
-        emitter.makeParticles(particleName, 0, 50, false, false);
+        emitter.makeParticles(ParticleName, 0, 50, false, false);
         emitter.explode(1000, 50);
         return { hitX: hitX, hitY: hitY };
     };

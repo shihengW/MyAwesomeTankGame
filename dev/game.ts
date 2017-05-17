@@ -10,27 +10,27 @@ class TheGame implements GameSocket, Inputs {
         this.game = new Phaser.Game(
             window.innerWidth - 30/*slideroffset*/, 
             window.innerHeight - 30/*slideroffset*/, 
-            Phaser.CANVAS, 'body', { 
-                create: this.create, preload: this.preload, update: this.update
+            Phaser.CANVAS, 'body', {
                 // TODO: Check this http://phaser.io/docs/2.4.4/Phaser.State.html
+                create: this.create, preload: this.preload, update: this.update
         });
     }
 
     preload() {
-        this.game.load.image(sandbagName, "../resources/tank.png");
-        this.game.load.image(bulletName, "../resources/bullet.png");
-        this.game.load.image(particleName, "../resources/particle.png");
-        this.game.load.image(tankbodyName, "../resources/tankbody.png");
-        this.game.load.image(guntowerName, "../resources/guntower.png");
+        this.game.load.image(SandbagName, "../resources/tank.png");
+        this.game.load.image(BulletName, "../resources/bullet.png");
+        this.game.load.image(ParticleName, "../resources/particle.png");
+        this.game.load.image(TankbodyName, "../resources/tankbody.png");
+        this.game.load.image(GuntowerName, "../resources/guntower.png");
         this.game.stage.disableVisibilityChange = true;
     }
 
     create() {
         // Set-up physics.
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
-
-        let self = this;
+        
         // Set-up bg, player, socket, map, joystick.
+        let self = this;
         TheGame.setupBackground(this.game);
         TheGame.prototype.setupKeys(self);
         TheGame.setupPlayer(self);
@@ -51,14 +51,14 @@ class TheGame implements GameSocket, Inputs {
         else {
             message = this._player.update(this.game.input.activePointer.isDown);
         }
-        this._socket.emit(tankUpdateEventName, message);
+        this._socket.emit(TankUpdateEventName, message);
         
         // Then, check collision.
         if (this._enemies != undefined) {
             this._enemies.forEach(enemy => {
                 let hitMessage = this._player.combat(enemy);
                 if (hitMessage != undefined) {
-                    this._socket.emit(hitEventName, hitMessage);
+                    this._socket.emit(HitEventName, hitMessage);
                 }
             });
         }
