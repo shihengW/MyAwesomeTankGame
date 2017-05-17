@@ -2,6 +2,7 @@ class Drive {
     direction: Directions = Directions.None;
     _tankbody: Phaser.Sprite;
     _gameOver: boolean = false;
+    _bloodText: Phaser.Text;
     
     drive(d: Directions) {
         if (this._gameOver) {
@@ -18,6 +19,9 @@ class Drive {
         
         let angle = DriveHelpers.directionToAngle(d);
         this._tankbody.angle = angle;
-        DriveHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        DriveHelpers.setAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        let angleInRad = Phaser.Math.degToRad(angle);
+        this._bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
+        this._bloodText.angle = -1 * this._tankbody.angle;
     }
 }

@@ -39,11 +39,6 @@ var GoneEventName = "gone";
 var GoneGlobalEventName = "goneGlobal";
 var HitEventName = "hit";
 var HitGlobalEventName = "hitGlobal";
-var Combat = (function () {
-    function Combat() {
-    }
-    return Combat;
-}());
 var Inputs = (function () {
     function Inputs() {
     }
@@ -469,7 +464,7 @@ var DriveHelpers = (function () {
         }
         return Directions.None;
     };
-    DriveHelpers.angleToAcceleration = function (angle, acceleration, maxVelocity) {
+    DriveHelpers.setAcceleration = function (angle, acceleration, maxVelocity) {
         var angleRad = Phaser.Math.degToRad(angle);
         var sinAngle = Math.sin(angleRad);
         var negCosAngle = 0 - Math.cos(angleRad);
@@ -527,7 +522,10 @@ var Drive = (function () {
         }
         var angle = DriveHelpers.directionToAngle(d);
         this._tankbody.angle = angle;
-        DriveHelpers.angleToAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        DriveHelpers.setAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        var angleInRad = Phaser.Math.degToRad(angle);
+        this._bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
+        this._bloodText.angle = -1 * this._tankbody.angle;
     };
     return Drive;
 }());
@@ -565,7 +563,7 @@ var Shoot = (function () {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
         var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
-        var theta = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
+        var theta = Phaser.Math.degToRad(this._guntower.angle - this._tankbody.angle) + randomAngleOffset;
         // Set-up constants.
         var halfLength = this._guntower.height / 2;
         var sinTheta = Math.sin(theta);
@@ -584,7 +582,6 @@ var Shoot = (function () {
         var bullet = this._bullets.getFirstDead();
         bullet.rotation = theta;
         bullet.reset(startX, startY);
-        // bullet.body.angularVelocity = 5000;
         this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
     };
     return Shoot;
@@ -595,16 +592,8 @@ var Tank = (function () {
         this.direction = Directions.None;
         this._gameOver = false;
         this.nextFireTime = 0;
-        // Set-up basics.
-        this._ownerGame = game;
-        this.id = id;
-        this.blood = 100;
-        // Set-up body, gun and text.
-        var tank = this.createTank(game, x, y);
-        this._tankbody = tank.body;
-        this._guntower = tank.gun;
-        this._bloodText = tank.text;
-        this._bullets = tank.bullets;
+        this.setupGame(game, id);
+        this.setupTank(game, x, y);
     }
     Tank.prototype.update = function (shouldFire) {
         // If game over, do nothing.
@@ -612,7 +601,7 @@ var Tank = (function () {
             return this.getJson(undefined);
         }
         // Sync position.
-        this.syncPosition();
+        this.updateAngleAndBlood();
         // Fire.
         var fire = undefined;
         if (shouldFire) {
@@ -653,39 +642,44 @@ var Tank = (function () {
     Tank.prototype.getBody = function () {
         return this._tankbody;
     };
-    Tank.prototype.createTank = function (game, x, y) {
-        var body = game.add.sprite(x, y, TankbodyName);
-        var gun = game.add.sprite(x, y, GuntowerName);
-        var text = game.add.text(x, y - BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
-        body.anchor.set(0.5, 0.5);
-        gun.anchor.set(0.5, 0.5);
-        text.anchor.set(0.5, 0.5);
-        // Setup physics
-        game.physics.arcade.enable(body);
-        body.body.collideWorldBounds = true;
-        body.body.bounce.set(0.1, 0.1);
-        body.body.maxVelocity.set(MaxVelocity);
+    Tank.prototype.setupGame = function (game, id) {
+        this._ownerGame = game;
+        this.id = id;
+        this.blood = 100;
+    };
+    Tank.prototype.setupTank = function (game, x, y) {
+        // This is the parent.
+        this._tankbody = game.add.sprite(x, y, TankbodyName);
+        // These are children.
+        this._guntower = game.make.sprite(0, 0, GuntowerName);
+        this._bloodText = game.add.text(0, 0 - BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
+        this._tankbody.anchor.set(0.5, 0.5);
+        this._guntower.anchor.set(0.5, 0.5);
+        this._bloodText.anchor.set(0.5, 0.5);
+        this._tankbody.addChild(this._guntower);
+        this._tankbody.addChild(this._bloodText);
+        // Setup physics only to body.
+        game.physics.arcade.enable(this._tankbody);
+        this._tankbody.body.collideWorldBounds = true;
+        this._tankbody.body.bounce.set(0.1, 0.1);
+        this._tankbody.body.maxVelocity.set(MaxVelocity);
         // Create bullets.
-        var bullets = game.add.group();
-        bullets.enableBody = true;
-        bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        bullets.createMultiple(50, BulletName);
-        bullets.setAll("checkWorldBounds", true);
-        bullets.setAll("outOfBoundsKill", true);
-        bullets.forEach(function (item) {
+        this._bullets = game.add.group();
+        this._bullets.enableBody = true;
+        this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
+        this._bullets.createMultiple(50, BulletName);
+        this._bullets.setAll("checkWorldBounds", true);
+        this._bullets.setAll("outOfBoundsKill", true);
+        this._bullets.forEach(function (item) {
             item.body.bounce.set(0.1, 0.1);
             item.anchor.set(0.5, 1);
             item.body.mass = 0.05;
         }, this);
-        return { body: body, gun: gun, text: text, bullets: bullets };
     };
-    Tank.prototype.syncPosition = function () {
+    Tank.prototype.updateAngleAndBlood = function () {
         // First, move gun tower to point to mouse.
-        var angle = this._ownerGame.physics.arcade.angleToPointer(this._guntower);
-        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90;
-        // Second, force to coordinate the guntower, tankbody and blood text
-        this._guntower.position = this._tankbody.position;
-        this._bloodText.position = new Phaser.Point(this._tankbody.position.x, this._tankbody.position.y + BloodTextOffset);
+        var angle = this._ownerGame.physics.arcade.angleToPointer(this._tankbody);
+        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90 - this._tankbody.angle;
         this._bloodText.text = this.blood;
     };
     Tank.prototype.getJson = function (firingTo) {
@@ -727,8 +721,6 @@ var Tank = (function () {
         this._tankbody.body.velocity.x = 0;
         this._tankbody.body.velocity.y = 0;
         this._tankbody.position = position;
-        this._guntower.position = position;
-        this._bloodText.position = new Phaser.Point(position.x, position.y + BloodTextOffset);
         this.blood = blood;
         this._bloodText.text = blood;
         if (this.blood <= 0) {

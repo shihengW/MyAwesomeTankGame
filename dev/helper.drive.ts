@@ -61,7 +61,7 @@ class DriveHelpers {
         return Directions.None;
     }
 
-    static angleToAcceleration(angle: number, acceleration: Phaser.Point, maxVelocity: Phaser.Point) {
+    static setAcceleration(angle: number, acceleration: Phaser.Point, maxVelocity: Phaser.Point) {
         let angleRad = Phaser.Math.degToRad(angle);
         let sinAngle = Math.sin(angleRad);
         let negCosAngle = 0 - Math.cos(angleRad);

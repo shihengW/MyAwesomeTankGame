@@ -43,7 +43,7 @@ class Shoot {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
         const randomAngleOffset: number = (Math.random() - 0.5) * AngleOffsetBase;
-        const theta: number = Phaser.Math.degToRad(this._guntower.angle) + randomAngleOffset;
+        const theta: number = Phaser.Math.degToRad(this._guntower.angle - this._tankbody.angle) + randomAngleOffset;
 
         // Set-up constants.
         const halfLength: number = this._guntower.height / 2;
@@ -67,7 +67,6 @@ class Shoot {
         bullet.rotation = theta;
         bullet.reset(startX, startY);
 
-        // bullet.body.angularVelocity = 5000;
         this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
     }   
 }

@@ -1,19 +1,31 @@
 class Tank implements Shoot, Drive {   
+// Mixin-Drive
+    direction: Directions = Directions.None;
+    _tankbody: Phaser.Sprite;
+    _gameOver: boolean = false;
+    drive: (d: Directions) => void;
+// ----
+
+// Mixin-Fight
+    _bullets: Phaser.Group; 
+    _ownerGame: Phaser.Game;
+    _guntower: Phaser.Sprite;
+    blood: number;
+
+    fire: (firingTo: number) => number;
+    nextFireTime: number = 0;
+
+    shouldFire: (firingTo: number) => boolean;
+    calculateTrajectory: () => Trajectory;
+    fireInternal: (startX: number, startY: number, moveToX: number, moveToY: number) => void;
+// ----
+
     id: number;
-    private _bloodText: Phaser.Text;
+    _bloodText: Phaser.Text;
 
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
-        // Set-up basics.
-        this._ownerGame = game;
-        this.id = id;
-        this.blood = 100;
-
-        // Set-up body, gun and text.
-        let tank = this.createTank(game, x, y);
-        this._tankbody = tank.body;
-        this._guntower = tank.gun;
-        this._bloodText = tank.text;
-        this._bullets = tank.bullets;
+        this.setupGame(game, id);
+        this.setupTank(game, x, y);
     }
 
     update(shouldFire): Message {
@@ -21,8 +33,9 @@ class Tank implements Shoot, Drive {
         if (this._gameOver) { 
             return this.getJson(undefined); 
         }
+
         // Sync position.
-        this.syncPosition();
+        this.updateAngleAndBlood();
 
         // Fire.
         let fire: number = undefined;
@@ -73,47 +86,51 @@ class Tank implements Shoot, Drive {
         return this._tankbody;
     }
 
-    private createTank(game: Phaser.Game, x: number, y: number) : 
-            { body: Phaser.Sprite, gun: Phaser.Sprite, text: Phaser.Text, bullets: Phaser.Group } {
-        let body = game.add.sprite(x, y, TankbodyName);
-        let gun = game.add.sprite(x, y, GuntowerName);
-        let text = game.add.text(x, y - BloodTextOffset, <string><any>(this.blood), 
+    private setupGame(game: Phaser.Game, id: number) {
+        this._ownerGame = game;
+        this.id = id;
+        this.blood = 100;
+    }
+
+    private setupTank(game: Phaser.Game, x: number, y: number) {
+        // This is the parent.
+        this._tankbody = game.add.sprite(x, y, TankbodyName);
+        // These are children.
+        this._guntower = game.make.sprite(0, 0, GuntowerName);
+        this._bloodText = game.add.text(0, 0 - BloodTextOffset, <string><any>(this.blood), 
                     { font: "20px Arial", fill: "#00A000", align: "center" });
 
-        body.anchor.set(0.5, 0.5);
-        gun.anchor.set(0.5, 0.5);
-        text.anchor.set(0.5, 0.5);
+        this._tankbody.anchor.set(0.5, 0.5);
+        this._guntower.anchor.set(0.5, 0.5);
+        this._bloodText.anchor.set(0.5, 0.5);
+        
+        this._tankbody.addChild(this._guntower);
+        this._tankbody.addChild(this._bloodText);
     
-        // Setup physics
-        game.physics.arcade.enable(body);
-        body.body.collideWorldBounds = true;
-        body.body.bounce.set(0.1, 0.1);
-        body.body.maxVelocity.set(MaxVelocity);
+        // Setup physics only to body.
+        game.physics.arcade.enable(this._tankbody);
+        this._tankbody.body.collideWorldBounds = true;
+        this._tankbody.body.bounce.set(0.1, 0.1);
+        this._tankbody.body.maxVelocity.set(MaxVelocity);
         
         // Create bullets.
-        let bullets = game.add.group();
-        bullets.enableBody = true;
-        bullets.physicsBodyType = Phaser.Physics.ARCADE;
-        bullets.createMultiple(50, BulletName);
+        this._bullets = game.add.group();
+        this._bullets.enableBody = true;
+        this._bullets.physicsBodyType = Phaser.Physics.ARCADE;
+        this._bullets.createMultiple(50, BulletName);
 
-        bullets.setAll("checkWorldBounds", true);
-        bullets.setAll("outOfBoundsKill", true);
-        bullets.forEach((item:Phaser.Sprite) => { 
+        this._bullets.setAll("checkWorldBounds", true);
+        this._bullets.setAll("outOfBoundsKill", true);
+        this._bullets.forEach((item:Phaser.Sprite) => { 
             item.body.bounce.set(0.1, 0.1);
             item.anchor.set(0.5, 1);
             item.body.mass = 0.05; }, this);
-        return { body: body, gun: gun, text: text, bullets: bullets};
     }
 
-    private syncPosition() {
+    private updateAngleAndBlood() {
         // First, move gun tower to point to mouse.
-        const angle: number = this._ownerGame.physics.arcade.angleToPointer(this._guntower);
-        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90;
-
-        // Second, force to coordinate the guntower, tankbody and blood text
-        this._guntower.position = this._tankbody.position;
-        this._bloodText.position = new Phaser.Point(this._tankbody.position.x, 
-            this._tankbody.position.y + BloodTextOffset);
+        const angle: number = this._ownerGame.physics.arcade.angleToPointer(this._tankbody);
+        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90 - this._tankbody.angle;
         this._bloodText.text = <string><any>this.blood;
     }
 
@@ -162,8 +179,6 @@ class Tank implements Shoot, Drive {
         this._tankbody.body.velocity.y = 0;
 
         this._tankbody.position = position;
-        this._guntower.position = position;
-        this._bloodText.position = new Phaser.Point(position.x, position.y + BloodTextOffset);
         
         this.blood = blood;
         this._bloodText.text = <string><any>blood;
@@ -219,27 +234,6 @@ class Tank implements Shoot, Drive {
             blood: this.blood
         }
     }
-
-// Mixin-Drive
-    direction: Directions = Directions.None;
-    _tankbody: Phaser.Sprite;
-    _gameOver: boolean = false;
-    drive: (d: Directions) => void;
-// ----
-
-// Mixin-Fight
-    _bullets: Phaser.Group; 
-    _ownerGame: Phaser.Game;
-    _guntower: Phaser.Sprite;
-    blood: number;
-
-    fire: (firingTo: number) => number;
-    nextFireTime: number = 0;
-
-    shouldFire: (firingTo: number) => boolean;
-    calculateTrajectory: () => Trajectory;
-    fireInternal: (startX: number, startY: number, moveToX: number, moveToY: number) => void;
-// ----
 }
 
 // Set-up mixin.
