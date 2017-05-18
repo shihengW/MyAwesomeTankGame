@@ -2,19 +2,19 @@ class TankHelper {
     
     static onExplode(self: Tank) {
         // If already exploded, return.
-        if (self._tankbody.body == null) {
+        if (self._gameOver) {
             return;
         }
 
         // Emit and destroy everything.
-        let emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
+        let emitter = self._ownerGame.add.emitter(self.body.position.x, self.body.position.y);
         emitter.makeParticles(ParticleName, 0, 200, true, false);
         emitter.explode(2000, 200);
         
-        self._tankbody.destroy();
         self._guntower.destroy();
         self._bloodText.destroy();
         self._bullets.destroy();
+        self.destroy();
     }
 
     static onHitVisual(bullet: Phaser.Sprite, tankBody: Phaser.Sprite, game: Phaser.Game) : { hitX: number, hitY: number } {
