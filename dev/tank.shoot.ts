@@ -2,7 +2,12 @@ class Shoot {
     _bullets: Phaser.Group;
     _ownerGame: Phaser.Game;
     _guntower: Phaser.Sprite;
-    _tankbody: Phaser.Sprite;
+
+    updateAngle() {
+        // First, move gun tower to point to mouse.
+        const angle: number = this._ownerGame.physics.arcade.angleToPointer(this._guntower.parent);
+        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90 - (<Phaser.Sprite> this._guntower.parent).angle;
+    }
 
     fire(firingTo: number = undefined) : number {
         if (!this.shouldFire(firingTo)) {
@@ -43,13 +48,13 @@ class Shoot {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
         const randomAngleOffset: number = (Math.random() - 0.5) * AngleOffsetBase;
-        const theta: number = Phaser.Math.degToRad(this._guntower.angle - this._tankbody.angle) + randomAngleOffset;
+        const theta: number = Phaser.Math.degToRad(this._guntower.angle + (<Phaser.Sprite> this._guntower.parent).angle) + randomAngleOffset;
 
         // Set-up constants.
         const halfLength: number = this._guntower.height / 2;
         const sinTheta = Math.sin(theta);
         const reverseCosTheta = -1 * Math.cos(theta);
-        const tankPosition = this._tankbody.body.center;
+        const tankPosition = (<Phaser.Sprite> this._guntower.parent).body.center;
 
         // Bullet start position and move to position.
         let startX: number = sinTheta * halfLength + tankPosition.x;

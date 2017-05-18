@@ -4,6 +4,7 @@ class Tank implements Shoot, Drive {
     _tankbody: Phaser.Sprite;
     _gameOver: boolean = false;
     drive: (d: Directions) => void;
+    updateAngle: () => void;
 // ----
 
 // Mixin-Fight
@@ -34,19 +35,24 @@ class Tank implements Shoot, Drive {
             return this.getJson(undefined); 
         }
 
-        // Sync position.
-        this.updateAngleAndBlood();
+        // 1. Gun points to pointer.
+        this.updateAngle();
 
-        // Fire.
+        // 2. Update blood.
+        this._bloodText.text = <string><any>this.blood;
+
+        // 3. Fire.
         let fire: number = undefined;
         if (shouldFire) { fire = this.fire(undefined); }
 
-        // Return result.
+        // 4. Get result.
         return this.getJson(fire);
     }
 
     updateAsPuppet(params: Message) {
-        this.updateAsPuppetCore(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
+        this.updateAsPuppetCore(params.gunAngle, params.tankAngle, 
+                new Phaser.Point(params.x, params.y),
+                params.firing, params.blood);
     }
 
     combat(another: Tank) : HitMessage {
@@ -63,15 +69,15 @@ class Tank implements Shoot, Drive {
 
         // Check if I hit anyone.
         this._bullets.forEachAlive((item: Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, another.getBody(), () => { 
-                Tank.onHitVisual(item, another.getBody(), self._ownerGame);
+            self._ownerGame.physics.arcade.collide(item, another._tankbody, () => { 
+                TankHelper.onHitVisual(item, another._tankbody, self._ownerGame);
             })
         }, this);
 
         // Check if I am dead
         if (this.blood <= 0) {
             this._gameOver = true;
-            Tank.onExplode(this);
+            TankHelper.onExplode(this);
         }
 
         return result;
@@ -79,11 +85,32 @@ class Tank implements Shoot, Drive {
 
     explode() {
         let self = this;
-        Tank.onExplode(self);
+        TankHelper.onExplode(self);
     }
-    
-    getBody() : Phaser.Sprite {
-        return this._tankbody;
+
+    getJson(firingTo: number) : Message {
+        // If already died, just return an useless message.
+        if (this._gameOver) {
+            return {
+                tankId: this.id,
+                x: -1,
+                y: -1,
+                gunAngle: 0,
+                tankAngle: 0,
+                firing: undefined,
+                blood: 0
+            };
+        }
+
+        return {
+            tankId: this.id,
+            x: this._tankbody.position.x,
+            y: this._tankbody.position.y,
+            gunAngle: this._guntower.angle,
+            tankAngle: this._tankbody.angle,
+            firing: firingTo,
+            blood: this.blood
+        }
     }
 
     private setupGame(game: Phaser.Game, id: number) {
@@ -127,38 +154,6 @@ class Tank implements Shoot, Drive {
             item.body.mass = 0.05; }, this);
     }
 
-    private updateAngleAndBlood() {
-        // First, move gun tower to point to mouse.
-        const angle: number = this._ownerGame.physics.arcade.angleToPointer(this._tankbody);
-        this._guntower.angle = Phaser.Math.radToDeg(angle) + 90 - this._tankbody.angle;
-        this._bloodText.text = <string><any>this.blood;
-    }
-
-    getJson(firingTo: number) : Message {
-        // If already died, just return an useless message.
-        if (this._gameOver) {
-            return {
-                tankId: this.id,
-                x: -1,
-                y: -1,
-                gunAngle: 0,
-                tankAngle: 0,
-                firing: undefined,
-                blood: 0
-            };
-        }
-
-        return {
-            tankId: this.id,
-            x: this._tankbody.position.x,
-            y: this._tankbody.position.y,
-            gunAngle: this._guntower.angle,
-            tankAngle: this._tankbody.angle,
-            firing: firingTo,
-            blood: this.blood
-        }
-    }
-
     private updateAsPuppetCore(gunAngle: number, tankAngle: number, position: Phaser.Point, firing: number, blood: number) {
         // if already gameover, do nothing.
         if (this._gameOver) {
@@ -168,7 +163,7 @@ class Tank implements Shoot, Drive {
         // if blood is less or equal to 0, set gameover tag, then explode.
         if (this.blood <= 0) {
             this._gameOver = true;
-            Tank.onExplode(this);
+            TankHelper.onExplode(this);
             return;
         }
 
@@ -184,7 +179,7 @@ class Tank implements Shoot, Drive {
         this._bloodText.text = <string><any>blood;
         if (this.blood <= 0) {
             let self = this;
-            Tank.onExplode(self);
+            TankHelper.onExplode(self);
         }
 
         if (firing != undefined) {
@@ -192,40 +187,10 @@ class Tank implements Shoot, Drive {
         }
     }
 
-    private static onExplode(self: Tank) {
-        // If already exploded, return.
-        if (self._tankbody.body == null) {
-            return;
-        }
-
-        // Emit and destroy everything.
-        let emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
-        emitter.makeParticles(ParticleName, 0, 200, true, false);
-        emitter.explode(2000, 200);
-        
-        self._tankbody.destroy();
-        self._guntower.destroy();
-        self._bloodText.destroy();
-        self._bullets.destroy();
-    }
-
-    static onHitVisual(bullet: Phaser.Sprite, tankBody: Phaser.Sprite, game: Phaser.Game) : { hitX: number, hitY: number } {
-        // Now we are creating the particle emitter, centered to the world
-        let hitX: number = (bullet.x + tankBody.body.x) / 2;
-        let hitY: number =  (bullet.y + tankBody.body.y) / 2;
-        bullet.kill();
-
-        // Get effect.
-        let emitter = game.add.emitter(hitX, hitY);
-        emitter.makeParticles(ParticleName, 0, 50, false, false);
-        emitter.explode(1000, 50);
-        return { hitX: hitX, hitY: hitY };
-    }
-
     private onHit(bullet: Phaser.Sprite): HitMessage {
         this.blood -= Math.floor(Math.random() * Damage);
         let self = this;
-        let result = Tank.onHitVisual(bullet, self._tankbody, this._ownerGame);
+        let result = TankHelper.onHitVisual(bullet, self._tankbody, this._ownerGame);
 
         return {
             tankId: this.id,
