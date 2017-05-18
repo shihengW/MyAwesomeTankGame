@@ -1,3 +1,13 @@
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 // Parameters  
 var FireRate = 200;
 var BulletSpeed = 2000;
@@ -192,10 +202,10 @@ var TheGame = (function () {
             if (this._player.direction != result.direction) {
                 this._player.drive(result.direction);
             }
-            message = this._player.update(result.fire);
+            message = this._player.updateTank(result.fire);
         }
         else {
-            message = this._player.update(this.game.input.activePointer.isDown);
+            message = this._player.updateTank(this.game.input.activePointer.isDown);
         }
         this._socket.emit(TankUpdateEventName, message);
         // Then, check collision.
@@ -214,8 +224,8 @@ var TheGame = (function () {
         var x = Math.floor(GameWidth * Math.random());
         var y = Math.floor(GameHeight * Math.random());
         var id = Math.ceil(Math.random() * 1000);
-        self._player = new Tank(self.game, id, x, y);
-        self.game.camera.follow(self._player._tankbody);
+        self._player = Tank.create(self.game, id, x, y);
+        self.game.camera.follow(self._player);
     };
     TheGame.setupBackground = function (game) {
         game.world.setBounds(0, 0, GameWidth, GameHeight);
@@ -531,7 +541,7 @@ var MiniMap = (function () {
         return new Phaser.Point(x / GameWidth * this._bounds.x + 10, y / GameHeight * this._bounds.y + 10);
     };
     MiniMap.prototype.getPlayer = function () {
-        return this.getPositionCore((this._player._tankbody).position.x, (this._player._tankbody).position.y);
+        return this.getPositionCore(this._player.position.x, this._player.position.y);
     };
     return MiniMap;
 }());
@@ -546,16 +556,16 @@ var Drive = (function () {
         }
         this.direction = d;
         if (d == Directions.None) {
-            this._tankbody.body.velocity.set(0, 0);
-            this._tankbody.body.acceleration.set(0, 0);
+            this.body.velocity.set(0, 0);
+            this.body.acceleration.set(0, 0);
             return;
         }
         var angle = DriveHelpers.directionToAngle(d);
-        this._tankbody.angle = angle;
-        DriveHelpers.setAcceleration(angle, this._tankbody.body.acceleration, this._tankbody.body.maxVelocity);
+        this.angle = angle;
+        DriveHelpers.setAcceleration(angle, this.body.acceleration, this.body.maxVelocity);
         var angleInRad = Phaser.Math.degToRad(angle);
         this._bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
-        this._bloodText.angle = -1 * this._tankbody.angle;
+        this._bloodText.angle = -1 * this.angle;
     };
     return Drive;
 }());
@@ -621,16 +631,24 @@ var Shoot = (function () {
     };
     return Shoot;
 }());
-var Tank = (function () {
+var Tank = (function (_super) {
+    __extends(Tank, _super);
     function Tank(game, id, x, y) {
+        var _this = _super.call(this, game, x, y, TankbodyName) || this;
         // Mixin-Drive
-        this.direction = Directions.None;
-        this._gameOver = false;
-        this.nextFireTime = 0;
-        this.setupGame(game, id);
-        this.setupTank(game, x, y);
+        _this.direction = Directions.None;
+        _this._gameOver = false;
+        _this.nextFireTime = 0;
+        _this.setupGame(game, id);
+        _this.setupTank(game, x, y);
+        return _this;
     }
-    Tank.prototype.update = function (shouldFire) {
+    Tank.create = function (game, id, x, y) {
+        var tank = new Tank(game, id, x, y);
+        game.add.existing(tank);
+        return tank;
+    };
+    Tank.prototype.updateTank = function (shouldFire) {
         // If game over, do nothing.
         if (this._gameOver) {
             return this.getJson(undefined);
@@ -655,14 +673,14 @@ var Tank = (function () {
         var result = undefined;
         // Check if I am hit by anyone.
         another._bullets.forEachAlive(function (item) {
-            self._ownerGame.physics.arcade.collide(item, self._tankbody, function (bullet, notUsed) {
+            self._ownerGame.physics.arcade.collide(item, self, function (bullet, notUsed) {
                 result = self.onHit(bullet);
             });
         }, this);
         // Check if I hit anyone.
         this._bullets.forEachAlive(function (item) {
-            self._ownerGame.physics.arcade.collide(item, another._tankbody, function () {
-                TankHelper.onHitVisual(item, another._tankbody, self._ownerGame);
+            self._ownerGame.physics.arcade.collide(item, another, function () {
+                TankHelper.onHitVisual(item, another, self._ownerGame);
             });
         }, this);
         // Check if I am dead
@@ -691,10 +709,10 @@ var Tank = (function () {
         }
         return {
             tankId: this.id,
-            x: this._tankbody.position.x,
-            y: this._tankbody.position.y,
+            x: this.position.x,
+            y: this.position.y,
             gunAngle: this._guntower.angle,
-            tankAngle: this._tankbody.angle,
+            tankAngle: this.angle,
             firing: firingTo,
             blood: this.blood
         };
@@ -705,21 +723,20 @@ var Tank = (function () {
         this.blood = 100;
     };
     Tank.prototype.setupTank = function (game, x, y) {
-        // This is the parent.
-        this._tankbody = game.add.sprite(x, y, TankbodyName);
         // These are children.
         this._guntower = game.make.sprite(0, 0, GuntowerName);
-        this._bloodText = game.add.text(0, 0 - BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
-        this._tankbody.anchor.set(0.5, 0.5);
+        this._bloodText = game.make.text(0, 0 - BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
+        this.anchor.set(0.5, 0.5);
         this._guntower.anchor.set(0.5, 0.5);
         this._bloodText.anchor.set(0.5, 0.5);
-        this._tankbody.addChild(this._guntower);
-        this._tankbody.addChild(this._bloodText);
+        // Set layout.
+        this.addChild(this._guntower);
+        this.addChild(this._bloodText);
         // Setup physics only to body.
-        game.physics.arcade.enable(this._tankbody);
-        this._tankbody.body.collideWorldBounds = true;
-        this._tankbody.body.bounce.set(0.1, 0.1);
-        this._tankbody.body.maxVelocity.set(MaxVelocity);
+        game.physics.arcade.enable(this);
+        this.body.collideWorldBounds = true;
+        this.body.bounce.set(0.1, 0.1);
+        this.body.maxVelocity.set(MaxVelocity);
         // Create bullets.
         this._bullets = game.add.group();
         this._bullets.enableBody = true;
@@ -745,10 +762,10 @@ var Tank = (function () {
             return;
         }
         this._guntower.angle = gunAngle;
-        this._tankbody.angle = tankAngle;
-        this._tankbody.body.velocity.x = 0;
-        this._tankbody.body.velocity.y = 0;
-        this._tankbody.position = position;
+        this.angle = tankAngle;
+        this.body.velocity.x = 0;
+        this.body.velocity.y = 0;
+        this.position = position;
         this.blood = blood;
         this._bloodText.text = blood;
         if (this.blood <= 0) {
@@ -762,7 +779,7 @@ var Tank = (function () {
     Tank.prototype.onHit = function (bullet) {
         this.blood -= Math.floor(Math.random() * Damage);
         var self = this;
-        var result = TankHelper.onHitVisual(bullet, self._tankbody, this._ownerGame);
+        var result = TankHelper.onHitVisual(bullet, self, this._ownerGame);
         return {
             tankId: this.id,
             hitX: result.hitX,
@@ -771,6 +788,6 @@ var Tank = (function () {
         };
     };
     return Tank;
-}());
+}(Phaser.Sprite));
 // Set-up mixin.
 applyMixins(Tank, [Drive, Shoot]);

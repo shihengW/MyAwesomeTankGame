@@ -65,6 +65,6 @@ class MiniMap {
     }
 
     private getPlayer() : Phaser.Point {
-        return this.getPositionCore((this._player._tankbody).position.x, (this._player._tankbody).position.y);
+        return this.getPositionCore((<Phaser.Sprite>this._player).position.x, (<Phaser.Sprite>this._player).position.y);
     }
 }

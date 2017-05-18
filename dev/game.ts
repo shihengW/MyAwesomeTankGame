@@ -46,10 +46,10 @@ class TheGame implements GameSocket, Inputs {
             if (this._player.direction != result.direction) {
                 this._player.drive(result.direction);
             }
-            message = this._player.update(result.fire);
+            message = this._player.updateTank(result.fire);
         }
         else {
-            message = this._player.update(this.game.input.activePointer.isDown);
+            message = this._player.updateTank(this.game.input.activePointer.isDown);
         }
         this._socket.emit(TankUpdateEventName, message);
         
@@ -72,8 +72,8 @@ class TheGame implements GameSocket, Inputs {
         let y = Math.floor(GameHeight * Math.random());
         let id = Math.ceil(Math.random() * 1000);
 
-        self._player = new Tank(self.game, id, x, y);
-        self.game.camera.follow(self._player._tankbody);
+        self._player = Tank.create(self.game, id, x, y);
+        self.game.camera.follow(self._player);
     }
 
     static setupBackground(game: Phaser.Game) {

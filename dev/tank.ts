@@ -1,7 +1,6 @@
-class Tank implements Shoot, Drive {   
+class Tank extends Phaser.Sprite implements Shoot, Drive {   
 // Mixin-Drive
     direction: Directions = Directions.None;
-    _tankbody: Phaser.Sprite;
     _gameOver: boolean = false;
     drive: (d: Directions) => void;
     updateAngle: () => void;
@@ -25,11 +24,18 @@ class Tank implements Shoot, Drive {
     _bloodText: Phaser.Text;
 
     constructor(game: Phaser.Game, id: number, x:number, y:number) {
+        super(game, x, y, TankbodyName);
         this.setupGame(game, id);
         this.setupTank(game, x, y);
     }
 
-    update(shouldFire): Message {
+    static create(game: Phaser.Game, id: number, x:number, y:number): Tank {
+        let tank = new Tank(game, id, x, y);
+        game.add.existing(tank);
+        return tank;
+    }
+
+    updateTank(shouldFire): Message {
         // If game over, do nothing.
         if (this._gameOver) { 
             return this.getJson(undefined); 
@@ -61,7 +67,7 @@ class Tank implements Shoot, Drive {
 
         // Check if I am hit by anyone.
         another._bullets.forEachAlive((item:Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, self._tankbody, 
+            self._ownerGame.physics.arcade.collide(item, self, 
                 (bullet: Phaser.Sprite, notUsed: any) => {
                     result = self.onHit(bullet);
                 });
@@ -69,8 +75,8 @@ class Tank implements Shoot, Drive {
 
         // Check if I hit anyone.
         this._bullets.forEachAlive((item: Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, another._tankbody, () => { 
-                TankHelper.onHitVisual(item, another._tankbody, self._ownerGame);
+            self._ownerGame.physics.arcade.collide(item, another, () => { 
+                TankHelper.onHitVisual(item, another, self._ownerGame);
             })
         }, this);
 
@@ -104,10 +110,10 @@ class Tank implements Shoot, Drive {
 
         return {
             tankId: this.id,
-            x: this._tankbody.position.x,
-            y: this._tankbody.position.y,
+            x: this.position.x,
+            y: this.position.y,
             gunAngle: this._guntower.angle,
-            tankAngle: this._tankbody.angle,
+            tankAngle: this.angle,
             firing: firingTo,
             blood: this.blood
         }
@@ -120,25 +126,24 @@ class Tank implements Shoot, Drive {
     }
 
     private setupTank(game: Phaser.Game, x: number, y: number) {
-        // This is the parent.
-        this._tankbody = game.add.sprite(x, y, TankbodyName);
         // These are children.
         this._guntower = game.make.sprite(0, 0, GuntowerName);
-        this._bloodText = game.add.text(0, 0 - BloodTextOffset, <string><any>(this.blood), 
+        this._bloodText = game.make.text(0, 0 - BloodTextOffset, <string><any>(this.blood), 
                     { font: "20px Arial", fill: "#00A000", align: "center" });
-
-        this._tankbody.anchor.set(0.5, 0.5);
+        
+        this.anchor.set(0.5, 0.5);
         this._guntower.anchor.set(0.5, 0.5);
         this._bloodText.anchor.set(0.5, 0.5);
-        
-        this._tankbody.addChild(this._guntower);
-        this._tankbody.addChild(this._bloodText);
+
+        // Set layout.
+        this.addChild(this._guntower);
+        this.addChild(this._bloodText);
     
         // Setup physics only to body.
-        game.physics.arcade.enable(this._tankbody);
-        this._tankbody.body.collideWorldBounds = true;
-        this._tankbody.body.bounce.set(0.1, 0.1);
-        this._tankbody.body.maxVelocity.set(MaxVelocity);
+        game.physics.arcade.enable(this);
+        this.body.collideWorldBounds = true;
+        this.body.bounce.set(0.1, 0.1);
+        this.body.maxVelocity.set(MaxVelocity);
         
         // Create bullets.
         this._bullets = game.add.group();
@@ -168,12 +173,12 @@ class Tank implements Shoot, Drive {
         }
 
         this._guntower.angle = gunAngle;
-        this._tankbody.angle = tankAngle;
+        this.angle = tankAngle;
         
-        this._tankbody.body.velocity.x = 0;
-        this._tankbody.body.velocity.y = 0;
+        this.body.velocity.x = 0;
+        this.body.velocity.y = 0;
 
-        this._tankbody.position = position;
+        this.position = position;
         
         this.blood = blood;
         this._bloodText.text = <string><any>blood;
@@ -190,7 +195,7 @@ class Tank implements Shoot, Drive {
     private onHit(bullet: Phaser.Sprite): HitMessage {
         this.blood -= Math.floor(Math.random() * Damage);
         let self = this;
-        let result = TankHelper.onHitVisual(bullet, self._tankbody, this._ownerGame);
+        let result = TankHelper.onHitVisual(bullet, self, this._ownerGame);
 
         return {
             tankId: this.id,
