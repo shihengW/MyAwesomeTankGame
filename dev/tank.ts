@@ -61,39 +61,6 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
                 params.firing, params.blood);
     }
 
-    combat(another: Tank) : HitMessage {
-        let self = this;
-        let result: HitMessage = undefined;
-
-        // Check if I am hit by anyone.
-        another._bullets.forEachAlive((item:Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, self, 
-                (bullet: Phaser.Sprite, notUsed: any) => {
-                    result = self.onHit(bullet);
-                });
-        }, this);
-
-        // Check if I hit anyone.
-        this._bullets.forEachAlive((item: Phaser.Sprite) => {
-            self._ownerGame.physics.arcade.collide(item, another, () => { 
-                TankHelper.onHitVisual(item, another, self._ownerGame);
-            })
-        }, this);
-
-        // Check if I am dead
-        if (this.blood <= 0) {
-            this._gameOver = true;
-            TankHelper.onExplode(this);
-        }
-
-        return result;
-    }
-
-    explode() {
-        let self = this;
-        TankHelper.onExplode(self);
-    }
-
     getJson(firingTo: number) : Message {
         // If already died, just return an useless message.
         if (this._gameOver) {
@@ -192,7 +159,7 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
         }
     }
 
-    private onHit(bullet: Phaser.Sprite): HitMessage {
+    onHit(bullet: Phaser.Sprite): HitMessage {
         this.blood -= Math.floor(Math.random() * Damage);
         let self = this;
         let result = TankHelper.onHitVisual(bullet, self, this._ownerGame);

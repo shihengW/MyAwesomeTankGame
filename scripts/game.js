@@ -18,8 +18,8 @@ var Acceleration = 300;
 var AngleOffsetBase = 0.1 * Math.PI; // degree.
 var GridHeight = 50;
 var GridWidth = 90;
-var GameHeight = 5000;
-var GameWidth = 5000;
+var GameHeight = 1000;
+var GameWidth = 1000;
 // Names
 var SandbagName = "sandbag";
 var TankbodyName = "tankbody";
@@ -119,14 +119,14 @@ var GameSocket = (function () {
         self._socket.on(GoneGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
             var tank = GameSocket.removeEnemyByJson(self, player);
-            tank.explode();
+            TankHelper.onExplode(tank);
         });
         self._socket.emit(AddNewEventName, self._player.getJson(undefined));
     };
     GameSocket.getOrAddEnemy = function (self, enemy) {
         var tank = undefined;
         if (self._enemies == undefined) {
-            tank = new Tank(self.game, enemy.tankId, 0, 0);
+            tank = Tank.create(self.game, enemy.tankId, 0, 0);
             self._enemies = [tank];
         }
         else {
@@ -138,7 +138,7 @@ var GameSocket = (function () {
                 }
             });
             if (!exist_1) {
-                tank = new Tank(self.game, enemy.tankId, 0, 0);
+                tank = Tank.create(self.game, enemy.tankId, 0, 0);
                 self._enemies.push(tank);
             }
         }
@@ -194,7 +194,6 @@ var TheGame = (function () {
         TheGame.setupForeground(self);
     };
     TheGame.prototype.update = function () {
-        var _this = this;
         var message = undefined;
         // First, update tank itself.
         if (this._joystick != undefined) {
@@ -209,16 +208,33 @@ var TheGame = (function () {
         }
         this._socket.emit(TankUpdateEventName, message);
         // Then, check collision.
-        if (this._enemies != undefined) {
-            this._enemies.forEach(function (enemy) {
-                var hitMessage = _this._player.combat(enemy);
-                if (hitMessage != undefined) {
-                    _this._socket.emit(HitEventName, hitMessage);
-                }
-            });
+        var hitMessage = TheGame.combat(this.game, this._player, this._enemies);
+        if (hitMessage != undefined) {
+            this._socket.emit(HitEventName, hitMessage);
+        }
+        if (this._player.blood <= 0) {
+            this._player._gameOver = true;
+            TankHelper.onExplode(this._player);
         }
         // Finally, update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
+    };
+    TheGame.combat = function (game, player, others) {
+        if (others == undefined) {
+            return undefined;
+        }
+        var hitMessage = undefined;
+        var tanks = others.concat(player);
+        var bullets = tanks.map(function (item) { return item._bullets; });
+        game.physics.arcade.collide(bullets, tanks, function (tank, bullet) {
+            if (tank.id === player.id) {
+                hitMessage = player.onHit(bullet);
+            }
+            else {
+                TankHelper.onHitVisual(bullet, tank, game);
+            }
+        });
+        return hitMessage;
     };
     TheGame.setupPlayer = function (self) {
         var x = Math.floor(GameWidth * Math.random());
@@ -463,17 +479,18 @@ var TankHelper = (function () {
     }
     TankHelper.onExplode = function (self) {
         // If already exploded, return.
-        if (self._tankbody.body == null) {
+        if (self._gameOver) {
             return;
         }
         // Emit and destroy everything.
-        var emitter = self._ownerGame.add.emitter(self._tankbody.body.position.x, self._tankbody.body.position.y);
+        var emitter = self._ownerGame.add.emitter(self.body.position.x, self.body.position.y);
         emitter.makeParticles(ParticleName, 0, 200, true, false);
         emitter.explode(2000, 200);
-        self._tankbody.destroy();
         self._guntower.destroy();
         self._bloodText.destroy();
         self._bullets.destroy();
+        self.destroy();
+        self.game.destroy();
     };
     TankHelper.onHitVisual = function (bullet, tankBody, game) {
         // Now we are creating the particle emitter, centered to the world
@@ -667,32 +684,6 @@ var Tank = (function (_super) {
     };
     Tank.prototype.updateAsPuppet = function (params) {
         this.updateAsPuppetCore(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
-    };
-    Tank.prototype.combat = function (another) {
-        var self = this;
-        var result = undefined;
-        // Check if I am hit by anyone.
-        another._bullets.forEachAlive(function (item) {
-            self._ownerGame.physics.arcade.collide(item, self, function (bullet, notUsed) {
-                result = self.onHit(bullet);
-            });
-        }, this);
-        // Check if I hit anyone.
-        this._bullets.forEachAlive(function (item) {
-            self._ownerGame.physics.arcade.collide(item, another, function () {
-                TankHelper.onHitVisual(item, another, self._ownerGame);
-            });
-        }, this);
-        // Check if I am dead
-        if (this.blood <= 0) {
-            this._gameOver = true;
-            TankHelper.onExplode(this);
-        }
-        return result;
-    };
-    Tank.prototype.explode = function () {
-        var self = this;
-        TankHelper.onExplode(self);
     };
     Tank.prototype.getJson = function (firingTo) {
         // If already died, just return an useless message.

@@ -54,17 +54,37 @@ class TheGame implements GameSocket, Inputs {
         this._socket.emit(TankUpdateEventName, message);
         
         // Then, check collision.
-        if (this._enemies != undefined) {
-            this._enemies.forEach(enemy => {
-                let hitMessage = this._player.combat(enemy);
-                if (hitMessage != undefined) {
-                    this._socket.emit(HitEventName, hitMessage);
-                }
-            });
+        let hitMessage = TheGame.combat(this.game, this._player, this._enemies);
+        if (hitMessage != undefined) {
+            this._socket.emit(HitEventName, hitMessage);
+        }
+
+        if (this._player.blood <= 0) {
+            this._player._gameOver = true;
+            TankHelper.onExplode(this._player);
         }
 
         // Finally, update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
+    }
+
+    static combat(game: Phaser.Game, player: Tank, others: Tank[]) : HitMessage {
+        if (others == undefined) {
+            return undefined;
+        }
+        let hitMessage: HitMessage = undefined;
+        let tanks = others.concat(player);
+        let bullets = tanks.map(item => item._bullets);
+        game.physics.arcade.collide(bullets, tanks, (tank: Tank, bullet: Phaser.Sprite) => {
+            if (tank.id === player.id) {
+                hitMessage = player.onHit(bullet);
+            }
+            else {
+                TankHelper.onHitVisual(bullet, tank, game);
+            }
+        });
+
+        return hitMessage;
     }
 
     static setupPlayer(self: TheGame) {

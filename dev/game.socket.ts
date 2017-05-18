@@ -20,7 +20,7 @@ class GameSocket {
         self._socket.on(GoneGlobalEventName, function(player: Message) {
             // If player has no blood, remove it from the list.
             let tank = GameSocket.removeEnemyByJson(self, player);
-            tank.explode();
+            TankHelper.onExplode(tank);
         });
 
         self._socket.emit(AddNewEventName, self._player.getJson(undefined));
@@ -29,7 +29,7 @@ class GameSocket {
     static getOrAddEnemy(self: TheGame, enemy: IdMessage) : Tank {
         let tank: Tank = undefined;
         if (self._enemies == undefined) {
-            tank = new Tank(self.game, enemy.tankId, 0, 0)
+            tank = Tank.create(self.game, enemy.tankId, 0, 0)
             self._enemies = [tank];
         }
         else {
@@ -41,7 +41,7 @@ class GameSocket {
                 } 
             });
             if (!exist) {
-                tank = new Tank(self.game, enemy.tankId, 0, 0);
+                tank = Tank.create(self.game, enemy.tankId, 0, 0);
                 self._enemies.push(tank);
             }
         }
