@@ -6,6 +6,7 @@ class TankHelper {
             return;
         }
 
+        self._gameOver = true;
         // Emit and destroy everything.
         let emitter = self._ownerGame.add.emitter(self.body.position.x, self.body.position.y);
         emitter.makeParticles(ParticleName, 0, 200, true, false);

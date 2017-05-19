@@ -69,4 +69,10 @@ class DriveHelpers {
         acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
         maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
     }
+
+    static syncBloodTextPosition(angle: number, bloodText: Phaser.Text) {
+        let angleInRad = Phaser.Math.degToRad(angle);
+        bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
+        bloodText.angle = -1 * angle;
+    }
 }

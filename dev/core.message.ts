@@ -1,5 +1,5 @@
 // A basic message should have position, blood and firing.
-interface Message extends IdMessage, PositionMessage, BloodMesssage {
+interface FullMessage extends IdMessage, PositionMessage, BloodMesssage {
     firing: number, // angle.
 }
 

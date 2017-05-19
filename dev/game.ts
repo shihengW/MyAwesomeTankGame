@@ -36,7 +36,7 @@ class TheGame implements Socket, Inputs {
     }
 
     update() {
-        let message: any = undefined;
+        let message: FullMessage = undefined;
         
         // 1. Drive or fire.
         if (this._joystick != undefined) {
@@ -53,9 +53,9 @@ class TheGame implements Socket, Inputs {
         // 2. check collision.
         let hitMessage = TheGame.combat(this.game, this._player, this._enemies);
 
-        // 3. Message.
+        // 3. Send message.
+        message.blood = this._player.blood;
         Socket.sendMessage(this._socket, TankUpdateEventName, message);
-        Socket.sendMessage(this._socket, HitEventName, hitMessage);
 
         // 4. Update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
@@ -135,7 +135,7 @@ class TheGame implements Socket, Inputs {
     _enemies: Tank[];
     setupSocket: (self: TheGame) => void;
     static getOrAddEnemy: (self: TheGame, enemy: IdMessage) => Tank;
-    static updateEnemyByJson: (self: TheGame, enemy: Message) => void;
+    static updateEnemyByJson: (self: TheGame, enemy: FullMessage) => void;
     static removeEnemyByJson: (self: TheGame, enemy: IdMessage) => Tank;
     static sendMessage: (socket: SocketIOClient.Socket, messageName: string, message: any) => void;
 //

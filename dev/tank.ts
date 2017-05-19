@@ -35,7 +35,7 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
         return tank;
     }
 
-    updateTank(shouldFire): Message {
+    updateTank(shouldFire): FullMessage {
         // If game over, do nothing.
         if (this._gameOver) { 
             return this.getJson(undefined); 
@@ -52,13 +52,17 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
         return this.getJson(fire);
     }
 
-    updateAsPuppet(params: Message) {
+    updateAsPuppet(params: FullMessage) {
+        if (this._gameOver) {
+            return;
+        }
+
         this.updateAsPuppetCore(params.gunAngle, params.tankAngle, 
                 new Phaser.Point(params.x, params.y),
                 params.firing, params.blood);
     }
 
-    getJson(firingTo: number) : Message {
+    getJson(firingTo: number) : FullMessage {
         // If already died, just return an useless message.
         if (this._gameOver) {
             return {
@@ -124,32 +128,25 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
     }
 
     private updateAsPuppetCore(gunAngle: number, tankAngle: number, position: Phaser.Point, firing: number, blood: number) {
-        // if already gameover, do nothing.
-        if (this._gameOver) {
-            return;
-        }
-
         // if blood is less or equal to 0, set gameover tag, then explode.
         if (this.blood <= 0) {
-            this._gameOver = true;
             TankHelper.onExplode(this);
             return;
         }
-
+        
+        let angleChanged: boolean = this.angle !== tankAngle;
+        if (angleChanged) {
+            this.angle = tankAngle;
+            DriveHelpers.syncBloodTextPosition(tankAngle, this._bloodText);
+        }
+        
         this._guntower.angle = gunAngle;
-        this.angle = tankAngle;
-        
-        this.body.velocity.x = 0;
-        this.body.velocity.y = 0;
-
+        this.body.velocity.setTo(0, 0);
         this.position = position;
-        
+
+        // Blood.        
         this.blood = blood;
         this._bloodText.text = <string><any>blood;
-        if (this.blood <= 0) {
-            let self = this;
-            TankHelper.onExplode(self);
-        }
 
         if (firing != undefined) {
             this.fire(firing);
@@ -158,12 +155,12 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
 
     onHit(bullet: Phaser.Sprite): HitMessage {
         this.blood -= Math.floor(Math.random() * Damage);
+        this._bloodText.text = <string><any>this.blood;
         let self = this;
         let result = TankHelper.onHitVisual(bullet, self, this._ownerGame);
 
         // Only check & explode here.
         if (this.blood <= 0) {
-            this._gameOver = true;
             TankHelper.onExplode(self);
         }
 

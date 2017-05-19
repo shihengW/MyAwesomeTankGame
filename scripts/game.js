@@ -211,9 +211,9 @@ var TheGame = (function () {
         }
         // 2. check collision.
         var hitMessage = TheGame.combat(this.game, this._player, this._enemies);
-        // 3. Message.
+        // 3. Send message.
+        message.blood = this._player.blood;
         Socket.sendMessage(this._socket, TankUpdateEventName, message);
-        Socket.sendMessage(this._socket, HitEventName, hitMessage);
         // 4. Update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     };
@@ -391,6 +391,11 @@ var DriveHelpers = (function () {
         acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
         maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
     };
+    DriveHelpers.syncBloodTextPosition = function (angle, bloodText) {
+        var angleInRad = Phaser.Math.degToRad(angle);
+        bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
+        bloodText.angle = -1 * angle;
+    };
     return DriveHelpers;
 }());
 var TankHelper = (function () {
@@ -401,6 +406,7 @@ var TankHelper = (function () {
         if (self._gameOver) {
             return;
         }
+        self._gameOver = true;
         // Emit and destroy everything.
         var emitter = self._ownerGame.add.emitter(self.body.position.x, self.body.position.y);
         emitter.makeParticles(ParticleName, 0, 200, true, false);
@@ -572,9 +578,7 @@ var Drive = (function () {
         var angle = DriveHelpers.directionToAngle(d);
         this.angle = angle;
         DriveHelpers.setAcceleration(angle, this.body.acceleration, this.body.maxVelocity);
-        var angleInRad = Phaser.Math.degToRad(angle);
-        this._bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
-        this._bloodText.angle = -1 * this.angle;
+        DriveHelpers.syncBloodTextPosition(angle, this._bloodText);
     };
     return Drive;
 }());
@@ -619,7 +623,7 @@ var Shoot = (function () {
         var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
         var theta = Phaser.Math.degToRad(this._guntower.angle + this._guntower.parent.angle) + randomAngleOffset;
         // Set-up constants.
-        var halfLength = this._guntower.height / 2;
+        var halfLength = this._guntower.height / 2 + 10 /*offset*/;
         var sinTheta = Math.sin(theta);
         var reverseCosTheta = -1 * Math.cos(theta);
         var position = this._guntower.parent.body.center;
@@ -673,6 +677,9 @@ var Tank = (function (_super) {
         return this.getJson(fire);
     };
     Tank.prototype.updateAsPuppet = function (params) {
+        if (this._gameOver) {
+            return;
+        }
         this.updateAsPuppetCore(params.gunAngle, params.tankAngle, new Phaser.Point(params.x, params.y), params.firing, params.blood);
     };
     Tank.prototype.getJson = function (firingTo) {
@@ -732,38 +739,33 @@ var Tank = (function (_super) {
         }, this);
     };
     Tank.prototype.updateAsPuppetCore = function (gunAngle, tankAngle, position, firing, blood) {
-        // if already gameover, do nothing.
-        if (this._gameOver) {
-            return;
-        }
         // if blood is less or equal to 0, set gameover tag, then explode.
         if (this.blood <= 0) {
-            this._gameOver = true;
             TankHelper.onExplode(this);
             return;
         }
+        var angleChanged = this.angle !== tankAngle;
+        if (angleChanged) {
+            this.angle = tankAngle;
+            DriveHelpers.syncBloodTextPosition(tankAngle, this._bloodText);
+        }
         this._guntower.angle = gunAngle;
-        this.angle = tankAngle;
-        this.body.velocity.x = 0;
-        this.body.velocity.y = 0;
+        this.body.velocity.setTo(0, 0);
         this.position = position;
+        // Blood.        
         this.blood = blood;
         this._bloodText.text = blood;
-        if (this.blood <= 0) {
-            var self_1 = this;
-            TankHelper.onExplode(self_1);
-        }
         if (firing != undefined) {
             this.fire(firing);
         }
     };
     Tank.prototype.onHit = function (bullet) {
         this.blood -= Math.floor(Math.random() * Damage);
+        this._bloodText.text = this.blood;
         var self = this;
         var result = TankHelper.onHitVisual(bullet, self, this._ownerGame);
         // Only check & explode here.
         if (this.blood <= 0) {
-            this._gameOver = true;
             TankHelper.onExplode(self);
         }
         return {

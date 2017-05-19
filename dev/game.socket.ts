@@ -5,19 +5,19 @@ class Socket {
     setupSocket(self: TheGame) {
         self._socket = io();
         // Add new -> show.
-        self._socket.on(AddNewGlobalEventName, function(player: Message) {
+        self._socket.on(AddNewGlobalEventName, function(player: FullMessage) {
             Socket.updateEnemyByJson(self, player);
         });
 
         // Update -> update.
-        self._socket.on(TankUpdateGlobalEventName, function(player: Message) {
+        self._socket.on(TankUpdateGlobalEventName, function(player: FullMessage) {
             Socket.updateEnemyByJson(self, player);
             if (player.firing != undefined) {
                 self._miniMap.blinkEnemy(player.x, player.y);
             }
          });
 
-        self._socket.on(GoneGlobalEventName, function(player: Message) {
+        self._socket.on(GoneGlobalEventName, function(player: FullMessage) {
             // If player has no blood, remove it from the list.
             let tank = Socket.removeEnemyByJson(self, player);
             TankHelper.onExplode(tank);
@@ -32,7 +32,7 @@ class Socket {
         }
     }
 
-    static updateEnemyByJson(self: TheGame, enemy: Message) {
+    static updateEnemyByJson(self: TheGame, enemy: FullMessage) {
         let tank = Socket.getOrAddEnemy(self, enemy);
         tank.updateAsPuppet(enemy)
     }

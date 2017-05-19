@@ -51,7 +51,7 @@ class Shoot {
         const theta: number = Phaser.Math.degToRad(this._guntower.angle + (<Phaser.Sprite> this._guntower.parent).angle) + randomAngleOffset;
 
         // Set-up constants.
-        const halfLength: number = this._guntower.height / 2;
+        const halfLength: number = this._guntower.height / 2 + 10 /*offset*/;
         const sinTheta = Math.sin(theta);
         const reverseCosTheta = -1 * Math.cos(theta);
         const position = (<Phaser.Sprite> this._guntower.parent).body.center;

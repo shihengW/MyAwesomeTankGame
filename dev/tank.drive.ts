@@ -19,8 +19,6 @@ class Drive {
         let angle = DriveHelpers.directionToAngle(d);
         (<Phaser.Sprite>this).angle = angle;
         DriveHelpers.setAcceleration(angle, (<Phaser.Sprite>this).body.acceleration, (<Phaser.Sprite>this).body.maxVelocity);
-        let angleInRad = Phaser.Math.degToRad(angle);
-        this._bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
-        this._bloodText.angle = -1 * (<Phaser.Sprite>this).angle;
+        DriveHelpers.syncBloodTextPosition(angle, this._bloodText);
     }
 }
