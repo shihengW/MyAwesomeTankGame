@@ -8,8 +8,8 @@ const Acceleration: number = 300;
 const AngleOffsetBase: number = 0.1 * Math.PI; // degree.
 const GridHeight = 50;
 const GridWidth = 90;
-const GameHeight = 1000;
-const GameWidth = 1000;
+const GameHeight = 3000;
+const GameWidth = 3000;
 
 // Names
 const SandbagName: string = "sandbag";

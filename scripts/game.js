@@ -18,8 +18,8 @@ var Acceleration = 300;
 var AngleOffsetBase = 0.1 * Math.PI; // degree.
 var GridHeight = 50;
 var GridWidth = 90;
-var GameHeight = 1000;
-var GameWidth = 1000;
+var GameHeight = 3000;
+var GameWidth = 3000;
 // Names
 var SandbagName = "sandbag";
 var TankbodyName = "tankbody";
@@ -63,11 +63,11 @@ var Inputs = (function () {
     };
     Inputs.prototype.onKeyDown = function (e) {
         var addDirection = Inputs.mapKeyToDirection(e.event.key);
-        DriveHelpers.addDirectionIntegral(this._player, addDirection);
+        this._player.addDirection(addDirection);
     };
     Inputs.prototype.onKeyUp = function (e) {
         var removeDirection = Inputs.mapKeyToDirection(e.event.key);
-        DriveHelpers.removeDirectionIntegral(this._player, removeDirection);
+        this._player.removeDirection(removeDirection);
     };
     Inputs.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
         var realKey = self.game.input.keyboard.addKey(key);
@@ -327,77 +327,6 @@ var MobileChecker = (function () {
     return MobileChecker;
 }());
 ;
-/// <reference path="../.ts_dependencies/phaser.d.ts" />
-var DriveHelpers = (function () {
-    function DriveHelpers() {
-    }
-    DriveHelpers.addDirectionIntegral = function (tank, addDirection) {
-        var newDirection = DriveHelpers.addDirection(tank.direction, addDirection);
-        tank.drive(newDirection);
-    };
-    DriveHelpers.removeDirectionIntegral = function (tank, removeDirection) {
-        var newDirection = DriveHelpers.removeDirection(tank.direction, removeDirection);
-        tank.drive(newDirection);
-    };
-    DriveHelpers.directionToAngle = function (direction) {
-        switch (direction) {
-            case Directions.Up:
-                return 0;
-            case Directions.Down:
-                return 180;
-            case Directions.Left:
-                return -90;
-            case Directions.Right:
-                return 90;
-            case Directions.UpLeft:
-                return -45;
-            case Directions.DownLeft:
-                return 225;
-            case Directions.UpRight:
-                return 45;
-            case Directions.DownRight:
-                return 135;
-            default:
-                return undefined;
-        }
-    };
-    DriveHelpers.addDirection = function (direction, addDirection) {
-        // If direction alread has the added direction, just return. This case may barely happen.
-        if ((direction & addDirection) != 0) {
-            return Directions.None;
-        }
-        var opsiteDirection = DriveHelpers.getOpsiteDirection(addDirection);
-        if ((direction & opsiteDirection) != 0) {
-            return direction = direction & (~opsiteDirection);
-        }
-        return direction | addDirection;
-    };
-    DriveHelpers.removeDirection = function (direction, removeDirection) {
-        return direction & (~removeDirection);
-    };
-    DriveHelpers.getOpsiteDirection = function (direction) {
-        switch (direction) {
-            case Directions.Up: return Directions.Down;
-            case Directions.Down: return Directions.Up;
-            case Directions.Left: return Directions.Right;
-            case Directions.Right: return Directions.Left;
-        }
-        return Directions.None;
-    };
-    DriveHelpers.setAcceleration = function (angle, acceleration, maxVelocity) {
-        var angleRad = Phaser.Math.degToRad(angle);
-        var sinAngle = Math.sin(angleRad);
-        var negCosAngle = 0 - Math.cos(angleRad);
-        acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
-        maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
-    };
-    DriveHelpers.syncBloodTextPosition = function (angle, bloodText) {
-        var angleInRad = Phaser.Math.degToRad(angle);
-        bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
-        bloodText.angle = -1 * angle;
-    };
-    return DriveHelpers;
-}());
 var TankHelper = (function () {
     function TankHelper() {
     }
@@ -575,10 +504,75 @@ var Drive = (function () {
             this.body.acceleration.set(0, 0);
             return;
         }
-        var angle = DriveHelpers.directionToAngle(d);
+        var angle = Drive.directionToAngle(d);
         this.angle = angle;
-        DriveHelpers.setAcceleration(angle, this.body.acceleration, this.body.maxVelocity);
-        DriveHelpers.syncBloodTextPosition(angle, this._bloodText);
+        Drive.setAcceleration(angle, this.body.acceleration, this.body.maxVelocity);
+        Drive.syncBloodTextPosition(angle, this._bloodText);
+    };
+    Drive.prototype.addDirection = function (addDirection) {
+        var newDirection = Drive.addDirectionInternal(this.direction, addDirection);
+        this.drive(newDirection);
+    };
+    Drive.prototype.removeDirection = function (removeDirection) {
+        var newDirection = Drive.removeDirectionInternal(this.direction, removeDirection);
+        this.drive(newDirection);
+    };
+    Drive.directionToAngle = function (direction) {
+        switch (direction) {
+            case Directions.Up:
+                return 0;
+            case Directions.Down:
+                return 180;
+            case Directions.Left:
+                return -90;
+            case Directions.Right:
+                return 90;
+            case Directions.UpLeft:
+                return -45;
+            case Directions.DownLeft:
+                return 225;
+            case Directions.UpRight:
+                return 45;
+            case Directions.DownRight:
+                return 135;
+            default:
+                return undefined;
+        }
+    };
+    Drive.addDirectionInternal = function (direction, addDirection) {
+        // If direction alread has the added direction, just return. This case may barely happen.
+        if ((direction & addDirection) != 0) {
+            return Directions.None;
+        }
+        var opsiteDirection = Drive.getOpsiteDirection(addDirection);
+        if ((direction & opsiteDirection) != 0) {
+            return direction = direction & (~opsiteDirection);
+        }
+        return direction | addDirection;
+    };
+    Drive.removeDirectionInternal = function (direction, removeDirection) {
+        return direction & (~removeDirection);
+    };
+    Drive.getOpsiteDirection = function (direction) {
+        switch (direction) {
+            case Directions.Up: return Directions.Down;
+            case Directions.Down: return Directions.Up;
+            case Directions.Left: return Directions.Right;
+            case Directions.Right: return Directions.Left;
+        }
+        return Directions.None;
+    };
+    Drive.setAcceleration = function (angle, acceleration, maxVelocity) {
+        var angleRad = Phaser.Math.degToRad(angle);
+        var sinAngle = Math.sin(angleRad);
+        var negCosAngle = 0 - Math.cos(angleRad);
+        acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
+        maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
+    };
+    Drive.syncBloodTextPosition = function (angle, bloodText) {
+        var angleInRad = Phaser.Math.degToRad(angle);
+        bloodText.position.setTo(Math.sin(angleInRad) * BloodTextOffset, Math.cos(angleInRad) * BloodTextOffset);
+        bloodText.angle = -1 * angle;
     };
     return Drive;
 }());
@@ -597,7 +591,7 @@ var Shoot = (function () {
             return undefined;
         }
         // Calculate the trajectory.
-        var trajectory = this.calculateTrajectory();
+        var trajectory = Shoot.calculateTrajectory(this._guntower);
         // Force set direction?
         if (firingTo != undefined) {
             trajectory.theta = firingTo;
@@ -617,16 +611,23 @@ var Shoot = (function () {
         }
         return result;
     };
-    Shoot.prototype.calculateTrajectory = function () {
+    Shoot.prototype.fireInternal = function (theta, startX, startY, moveToX, moveToY) {
+        // Get bullet.
+        var bullet = this._bullets.getFirstDead();
+        bullet.rotation = theta;
+        bullet.reset(startX, startY);
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
+    };
+    Shoot.calculateTrajectory = function (guntower) {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
         var randomAngleOffset = (Math.random() - 0.5) * AngleOffsetBase;
-        var theta = Phaser.Math.degToRad(this._guntower.angle + this._guntower.parent.angle) + randomAngleOffset;
+        var theta = Phaser.Math.degToRad(guntower.angle + guntower.parent.angle) + randomAngleOffset;
         // Set-up constants.
-        var halfLength = this._guntower.height / 2 + 10 /*offset*/;
+        var halfLength = guntower.height / 2 + 10 /*offset*/;
         var sinTheta = Math.sin(theta);
         var reverseCosTheta = -1 * Math.cos(theta);
-        var position = this._guntower.parent.body.center;
+        var position = guntower.parent.body.center;
         // Bullet start position and move to position.
         var startX = sinTheta * halfLength + position.x;
         var startY = reverseCosTheta * halfLength + position.y;
@@ -635,22 +636,15 @@ var Shoot = (function () {
         return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
             startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
     };
-    Shoot.prototype.fireInternal = function (theta, startX, startY, moveToX, moveToY) {
-        // Get bullet.
-        var bullet = this._bullets.getFirstDead();
-        bullet.rotation = theta;
-        bullet.reset(startX, startY);
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
-    };
     return Shoot;
 }());
 var Tank = (function (_super) {
     __extends(Tank, _super);
     function Tank(game, id, x, y) {
         var _this = _super.call(this, game, x, y, TankbodyName) || this;
+        _this._gameOver = false;
         // Mixin-Drive
         _this.direction = Directions.None;
-        _this._gameOver = false;
         _this.nextFireTime = 0;
         _this.setupGame(game, id);
         _this.setupTank(game, x, y);
@@ -713,7 +707,7 @@ var Tank = (function (_super) {
     Tank.prototype.setupTank = function (game, x, y) {
         // These are children.
         this._guntower = game.make.sprite(0, 0, GuntowerName);
-        this._bloodText = game.make.text(0, 0 - BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
+        this._bloodText = game.make.text(0, BloodTextOffset, (this.blood), { font: "20px Arial", fill: "#00A000", align: "center" });
         this.anchor.set(0.5, 0.5);
         this._guntower.anchor.set(0.5, 0.5);
         this._bloodText.anchor.set(0.5, 0.5);
@@ -747,7 +741,7 @@ var Tank = (function (_super) {
         var angleChanged = this.angle !== tankAngle;
         if (angleChanged) {
             this.angle = tankAngle;
-            DriveHelpers.syncBloodTextPosition(tankAngle, this._bloodText);
+            Tank.syncBloodTextPosition(tankAngle, this._bloodText);
         }
         this._guntower.angle = gunAngle;
         this.body.velocity.setTo(0, 0);

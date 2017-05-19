@@ -1,9 +1,21 @@
 class Tank extends Phaser.Sprite implements Shoot, Drive {   
+    
+    _gameOver: boolean = false;
+
 // Mixin-Drive
     direction: Directions = Directions.None;
-    _gameOver: boolean = false;
     drive: (d: Directions) => void;
     updateAngle: () => void;
+    addDirection: (addDirection: Directions) => void;
+    removeDirection: (removeDirection: Directions) => void;
+    
+    // These are helpers.
+    private static directionToAngle: (direction: Directions) => number;
+    private static addDirectionInternal: (direction: Directions, addDirection: Directions) => Directions;
+    private static removeDirectionInternal: (direction: Directions, removeDirection: Directions) => Directions;
+    private static getOpsiteDirection: (direction: Directions) => Directions;
+    private static setAcceleration: (angle: number, acceleration: Phaser.Point, maxVelocity: Phaser.Point) => void;
+    private static syncBloodTextPosition: (angle: number, bloodText: Phaser.Text) => void;
 // ----
 
 // Mixin-Fight
@@ -15,9 +27,9 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
     fire: (firingTo: number) => number;
     nextFireTime: number = 0;
 
-    shouldFire: (firingTo: number) => boolean;
-    calculateTrajectory: () => Trajectory;
-    fireInternal: (startX: number, startY: number, moveToX: number, moveToY: number) => void;
+    private shouldFire: (firingTo: number) => boolean;
+    private fireInternal: (startX: number, startY: number, moveToX: number, moveToY: number) => void;
+    private static calculateTrajectory: (guntower: Phaser.Sprite) => Trajectory;
 // ----
 
     id: number;
@@ -96,7 +108,7 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
     private setupTank(game: Phaser.Game, x: number, y: number) {
         // These are children.
         this._guntower = game.make.sprite(0, 0, GuntowerName);
-        this._bloodText = game.make.text(0, 0 - BloodTextOffset, <string><any>(this.blood), 
+        this._bloodText = game.make.text(0, BloodTextOffset, <string><any>(this.blood), 
                     { font: "20px Arial", fill: "#00A000", align: "center" });
         
         this.anchor.set(0.5, 0.5);
@@ -137,7 +149,7 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
         let angleChanged: boolean = this.angle !== tankAngle;
         if (angleChanged) {
             this.angle = tankAngle;
-            DriveHelpers.syncBloodTextPosition(tankAngle, this._bloodText);
+            Tank.syncBloodTextPosition(tankAngle, this._bloodText);
         }
         
         this._guntower.angle = gunAngle;

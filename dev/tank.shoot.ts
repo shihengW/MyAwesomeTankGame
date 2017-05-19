@@ -15,7 +15,7 @@ class Shoot {
         }
 
         // Calculate the trajectory.
-        let trajectory: Trajectory = this.calculateTrajectory();
+        let trajectory: Trajectory = Shoot.calculateTrajectory(this._guntower);
 
         // Force set direction?
         if (firingTo != undefined) {
@@ -32,9 +32,9 @@ class Shoot {
 
     nextFireTime: number = 0;
 
-    shouldFire(firingTo: number): boolean {
-        let result = firingTo != undefined
-            || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
+    private shouldFire(firingTo: number): boolean {
+        let result = firingTo != undefined 
+                    || (this._ownerGame.time.now > this.nextFireTime && this._bullets.countDead() > 0);
 
         if (result) {
             // Set time.
@@ -44,17 +44,26 @@ class Shoot {
         return result;
     }
 
-    calculateTrajectory(): Trajectory {
+    private fireInternal(theta: number, startX: number, startY: number, moveToX: number, moveToY: number) {
+        // Get bullet.
+        const bullet: Phaser.Sprite = this._bullets.getFirstDead();
+        bullet.rotation = theta;
+        bullet.reset(startX, startY);
+
+        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
+    }
+
+    private static calculateTrajectory(guntower: Phaser.Sprite): Trajectory {
         // Get a random offset. I don't think I can support random offset since the current
         // comm system cannot do the coordinate if there is a offset.
         const randomAngleOffset: number = (Math.random() - 0.5) * AngleOffsetBase;
-        const theta: number = Phaser.Math.degToRad(this._guntower.angle + (<Phaser.Sprite> this._guntower.parent).angle) + randomAngleOffset;
+        const theta: number = Phaser.Math.degToRad(guntower.angle + (<Phaser.Sprite>guntower.parent).angle) + randomAngleOffset;
 
         // Set-up constants.
-        const halfLength: number = this._guntower.height / 2 + 10 /*offset*/;
+        const halfLength: number = guntower.height / 2 + 10 /*offset*/;
         const sinTheta = Math.sin(theta);
         const reverseCosTheta = -1 * Math.cos(theta);
-        const position = (<Phaser.Sprite> this._guntower.parent).body.center;
+        const position = (<Phaser.Sprite>guntower.parent).body.center;
 
         // Bullet start position and move to position.
         let startX: number = sinTheta * halfLength + position.x;
@@ -64,15 +73,6 @@ class Shoot {
 
         return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta, 
             startX: startX, startY: startY, moveToX: moveToX, moveToY: moveToY };
-    }
-
-    fireInternal(theta: number, startX: number, startY: number, moveToX: number, moveToY: number) {
-        // Get bullet.
-        const bullet: Phaser.Sprite = this._bullets.getFirstDead();
-        bullet.rotation = theta;
-        bullet.reset(startX, startY);
-
-        this._ownerGame.physics.arcade.moveToXY(bullet, moveToX, moveToY, BulletSpeed);
     }   
 }
 
