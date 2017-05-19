@@ -4,10 +4,14 @@
 #### 1. Coding convention
 ##### https://github.com/Microsoft/TypeScript/wiki/Coding-guidelines
 
+### Refactor:
+#### 1. Extract a base tank.
+#### 2. Reduce the number of classes and properties.
+
 ### Phaser:
-#### 1. Sprite.Children to hold guntower and text.
-#### 2. Extends Sprite.
-#### 3. Combat system, collide([group... group], [tank... tank]);
+#### 1. *[Done]* Sprite.Children to hold guntower and text.
+#### 2. *[Done]* Extends Sprite.
+#### 3. *[Done]* Combat system, collide([group... group], [tank... tank]);
 
 ### Bootstrap:
 #### 1. Refactor the html.
