@@ -44,14 +44,11 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
         // 1. Gun points to pointer.
         this.updateAngle();
 
-        // 2. Update blood.
-        this._bloodText.text = <string><any>this.blood;
-
-        // 3. Fire.
+        // 2. Fire.
         let fire: number = undefined;
         if (shouldFire) { fire = this.fire(undefined); }
 
-        // 4. Get result.
+        // Return.
         return this.getJson(fire);
     }
 
@@ -163,6 +160,12 @@ class Tank extends Phaser.Sprite implements Shoot, Drive {
         this.blood -= Math.floor(Math.random() * Damage);
         let self = this;
         let result = TankHelper.onHitVisual(bullet, self, this._ownerGame);
+
+        // Only check & explode here.
+        if (this.blood <= 0) {
+            this._gameOver = true;
+            TankHelper.onExplode(self);
+        }
 
         return {
             tankId: this.id,

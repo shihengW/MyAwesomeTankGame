@@ -1,7 +1,7 @@
 ﻿/// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
-class TheGame implements GameSocket, Inputs {
+class TheGame implements Socket, Inputs {
     game: Phaser.Game;
     _miniMap: MiniMap;
     _joystick: Joystick;
@@ -26,11 +26,8 @@ class TheGame implements GameSocket, Inputs {
     }
 
     create() {
-        // Set-up physics.
-        this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        
-        // Set-up bg, player, socket, map, joystick.
         let self = this;
+        this.game.physics.startSystem(Phaser.Physics.ARCADE);
         TheGame.setupBackground(this.game);
         TheGame.prototype.setupKeys(self);
         TheGame.setupPlayer(self);
@@ -40,7 +37,8 @@ class TheGame implements GameSocket, Inputs {
 
     update() {
         let message: any = undefined;
-        // First, update tank itself.
+        
+        // 1. Drive or fire.
         if (this._joystick != undefined) {
             let result = this._joystick.checkPointer();
             if (this._player.direction != result.direction) {
@@ -51,20 +49,15 @@ class TheGame implements GameSocket, Inputs {
         else {
             message = this._player.updateTank(this.game.input.activePointer.isDown);
         }
-        this._socket.emit(TankUpdateEventName, message);
-        
-        // Then, check collision.
+                
+        // 2. check collision.
         let hitMessage = TheGame.combat(this.game, this._player, this._enemies);
-        if (hitMessage != undefined) {
-            this._socket.emit(HitEventName, hitMessage);
-        }
 
-        if (this._player.blood <= 0) {
-            this._player._gameOver = true;
-            TankHelper.onExplode(this._player);
-        }
+        // 3. Message.
+        Socket.sendMessage(this._socket, TankUpdateEventName, message);
+        Socket.sendMessage(this._socket, HitEventName, hitMessage);
 
-        // Finally, update minimap.
+        // 4. Update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     }
 
@@ -72,6 +65,7 @@ class TheGame implements GameSocket, Inputs {
         if (others == undefined) {
             return undefined;
         }
+        
         let hitMessage: HitMessage = undefined;
         let tanks = others.concat(player);
         let bullets = tanks.map(item => item._bullets);
@@ -87,6 +81,8 @@ class TheGame implements GameSocket, Inputs {
         return hitMessage;
     }
 
+// set-ups
+
     static setupPlayer(self: TheGame) {
         let x = Math.floor(GameWidth * Math.random());
         let y = Math.floor(GameHeight * Math.random());
@@ -98,11 +94,30 @@ class TheGame implements GameSocket, Inputs {
 
     static setupBackground(game: Phaser.Game) {
         game.world.setBounds(0, 0, GameWidth, GameHeight);
-        DrawHelpers.drawGrids(game.add.graphics(0, 0), GameWidth, GameHeight);
+        TheGame.drawGrids(game.add.graphics(0, 0), GameWidth, GameHeight);
         let deadzoneOffsetX = Math.abs(Math.floor(game.width / 2.3));
         let deadzoneOffsetY = Math.abs(Math.floor(game.height / 2.3));
         game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, 
                 game.width - deadzoneOffsetX * 2, game.height - deadzoneOffsetY * 2);
+    }
+
+    static drawGrids(graphics: Phaser.Graphics, width: number, height: number) {
+        let hnum: number = Math.floor(width / GridWidth);
+        let vnum: number = Math.floor(height / GridHeight);
+
+        graphics.lineStyle(2, 0xE03F00, 1);
+        for (let i = 2; i < hnum - 2; i++) {
+            let x: number = i * GridWidth;
+            graphics.moveTo(x, 0);
+            graphics.lineTo(x, height);
+        }
+
+        graphics.lineStyle(2, 0x00E05E, 1);
+        for (let i = 2; i < vnum - 2; i++) {
+            let y: number = i * GridHeight;
+            graphics.moveTo(0, y);
+            graphics.lineTo(width, y);
+        }
     }
 
     static setupForeground(self: TheGame) {
@@ -113,6 +128,8 @@ class TheGame implements GameSocket, Inputs {
         }
     }
 
+//
+
 // Mixin-Socket
     _socket: any;
     _enemies: Tank[];
@@ -120,8 +137,10 @@ class TheGame implements GameSocket, Inputs {
     static getOrAddEnemy: (self: TheGame, enemy: IdMessage) => Tank;
     static updateEnemyByJson: (self: TheGame, enemy: Message) => void;
     static removeEnemyByJson: (self: TheGame, enemy: IdMessage) => Tank;
+    static sendMessage: (socket: SocketIOClient.Socket, messageName: string, message: any) => void;
 //
-// Inputs
+
+// Mixin-Inputs
     _player: Tank;
     setupKeys: (self: TheGame) => void;
     onKeyDown: (e: Phaser.Key) => void;
@@ -131,4 +150,4 @@ class TheGame implements GameSocket, Inputs {
 //
 }
 
-applyMixins(TheGame, [GameSocket, Inputs]);
+applyMixins(TheGame, [Socket, Inputs]);

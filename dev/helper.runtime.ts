@@ -6,7 +6,6 @@ function applyMixins(derivedCtor: any, baseCtors: any[]) {
     });
 }
 
-// TODO: Make it more like ts.
 class MobileChecker {
     private static Android() : RegExpMatchArray {
         return navigator.userAgent.match(/Android/i);

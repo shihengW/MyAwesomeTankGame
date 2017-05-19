@@ -1,4 +1,4 @@
-class GameSocket {
+class Socket {
     _socket: any;
     _enemies: Tank[];
 
@@ -6,12 +6,12 @@ class GameSocket {
         self._socket = io();
         // Add new -> show.
         self._socket.on(AddNewGlobalEventName, function(player: Message) {
-            GameSocket.updateEnemyByJson(self, player);
+            Socket.updateEnemyByJson(self, player);
         });
 
         // Update -> update.
         self._socket.on(TankUpdateGlobalEventName, function(player: Message) {
-            GameSocket.updateEnemyByJson(self, player);
+            Socket.updateEnemyByJson(self, player);
             if (player.firing != undefined) {
                 self._miniMap.blinkEnemy(player.x, player.y);
             }
@@ -19,11 +19,37 @@ class GameSocket {
 
         self._socket.on(GoneGlobalEventName, function(player: Message) {
             // If player has no blood, remove it from the list.
-            let tank = GameSocket.removeEnemyByJson(self, player);
+            let tank = Socket.removeEnemyByJson(self, player);
             TankHelper.onExplode(tank);
         });
 
         self._socket.emit(AddNewEventName, self._player.getJson(undefined));
+    }
+
+    static sendMessage(socket: SocketIOClient.Socket, messageName: string, message: any) {
+        if (message != undefined) {
+            socket.emit(messageName, message);
+        }
+    }
+
+    static updateEnemyByJson(self: TheGame, enemy: Message) {
+        let tank = Socket.getOrAddEnemy(self, enemy);
+        tank.updateAsPuppet(enemy)
+    }
+
+    static removeEnemyByJson(self: TheGame, enemy: IdMessage): Tank {
+        // TODO: Refactor these ugly logic.
+        let foundTank: Tank = undefined;
+        self._enemies.forEach(item => {
+            if (enemy.tankId == item.id) {
+                foundTank = item;
+            }});
+        let index = self._enemies.indexOf(foundTank);
+        if (index > -1) { 
+            self._enemies.splice(index, 1); 
+        }
+
+        return foundTank;
     }
 
     static getOrAddEnemy(self: TheGame, enemy: IdMessage) : Tank {
@@ -46,25 +72,5 @@ class GameSocket {
             }
         }
         return tank;
-    }
-
-    static updateEnemyByJson(self: TheGame, enemy: Message) {
-        let tank = GameSocket.getOrAddEnemy(self, enemy);
-        tank.updateAsPuppet(enemy)
-    }
-
-    static removeEnemyByJson(self: TheGame, enemy: IdMessage): Tank {
-        // TODO: Refactor these ugly logic.
-        let foundTank: Tank = undefined;
-        self._enemies.forEach(item => {
-            if (enemy.tankId == item.id) {
-                foundTank = item;
-            }});
-        let index = self._enemies.indexOf(foundTank);
-        if (index > -1) { 
-            self._enemies.splice(index, 1); 
-        }
-
-        return foundTank;
     }
 }

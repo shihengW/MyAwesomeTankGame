@@ -54,11 +54,11 @@ class Shoot {
         const halfLength: number = this._guntower.height / 2;
         const sinTheta = Math.sin(theta);
         const reverseCosTheta = -1 * Math.cos(theta);
-        const tankPosition = (<Phaser.Sprite> this._guntower.parent).body.center;
+        const position = (<Phaser.Sprite> this._guntower.parent).body.center;
 
         // Bullet start position and move to position.
-        let startX: number = sinTheta * halfLength + tankPosition.x;
-        let startY: number = reverseCosTheta * halfLength + tankPosition.y;
+        let startX: number = sinTheta * halfLength + position.x;
+        let startY: number = reverseCosTheta * halfLength + position.y;
         let moveToX: number = startX + sinTheta * Number.MAX_VALUE;
         let moveToY: number = startY + reverseCosTheta * Number.MAX_VALUE;
 

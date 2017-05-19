@@ -100,30 +100,53 @@ var Inputs = (function () {
     };
     return Inputs;
 }());
-var GameSocket = (function () {
-    function GameSocket() {
+var Socket = (function () {
+    function Socket() {
     }
-    GameSocket.prototype.setupSocket = function (self) {
+    Socket.prototype.setupSocket = function (self) {
         self._socket = io();
         // Add new -> show.
         self._socket.on(AddNewGlobalEventName, function (player) {
-            GameSocket.updateEnemyByJson(self, player);
+            Socket.updateEnemyByJson(self, player);
         });
         // Update -> update.
         self._socket.on(TankUpdateGlobalEventName, function (player) {
-            GameSocket.updateEnemyByJson(self, player);
+            Socket.updateEnemyByJson(self, player);
             if (player.firing != undefined) {
                 self._miniMap.blinkEnemy(player.x, player.y);
             }
         });
         self._socket.on(GoneGlobalEventName, function (player) {
             // If player has no blood, remove it from the list.
-            var tank = GameSocket.removeEnemyByJson(self, player);
+            var tank = Socket.removeEnemyByJson(self, player);
             TankHelper.onExplode(tank);
         });
         self._socket.emit(AddNewEventName, self._player.getJson(undefined));
     };
-    GameSocket.getOrAddEnemy = function (self, enemy) {
+    Socket.sendMessage = function (socket, messageName, message) {
+        if (message != undefined) {
+            socket.emit(messageName, message);
+        }
+    };
+    Socket.updateEnemyByJson = function (self, enemy) {
+        var tank = Socket.getOrAddEnemy(self, enemy);
+        tank.updateAsPuppet(enemy);
+    };
+    Socket.removeEnemyByJson = function (self, enemy) {
+        // TODO: Refactor these ugly logic.
+        var foundTank = undefined;
+        self._enemies.forEach(function (item) {
+            if (enemy.tankId == item.id) {
+                foundTank = item;
+            }
+        });
+        var index = self._enemies.indexOf(foundTank);
+        if (index > -1) {
+            self._enemies.splice(index, 1);
+        }
+        return foundTank;
+    };
+    Socket.getOrAddEnemy = function (self, enemy) {
         var tank = undefined;
         if (self._enemies == undefined) {
             tank = Tank.create(self.game, enemy.tankId, 0, 0);
@@ -144,25 +167,7 @@ var GameSocket = (function () {
         }
         return tank;
     };
-    GameSocket.updateEnemyByJson = function (self, enemy) {
-        var tank = GameSocket.getOrAddEnemy(self, enemy);
-        tank.updateAsPuppet(enemy);
-    };
-    GameSocket.removeEnemyByJson = function (self, enemy) {
-        // TODO: Refactor these ugly logic.
-        var foundTank = undefined;
-        self._enemies.forEach(function (item) {
-            if (enemy.tankId == item.id) {
-                foundTank = item;
-            }
-        });
-        var index = self._enemies.indexOf(foundTank);
-        if (index > -1) {
-            self._enemies.splice(index, 1);
-        }
-        return foundTank;
-    };
-    return GameSocket;
+    return Socket;
 }());
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
@@ -183,10 +188,8 @@ var TheGame = (function () {
         this.game.stage.disableVisibilityChange = true;
     };
     TheGame.prototype.create = function () {
-        // Set-up physics.
-        this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        // Set-up bg, player, socket, map, joystick.
         var self = this;
+        this.game.physics.startSystem(Phaser.Physics.ARCADE);
         TheGame.setupBackground(this.game);
         TheGame.prototype.setupKeys(self);
         TheGame.setupPlayer(self);
@@ -195,7 +198,7 @@ var TheGame = (function () {
     };
     TheGame.prototype.update = function () {
         var message = undefined;
-        // First, update tank itself.
+        // 1. Drive or fire.
         if (this._joystick != undefined) {
             var result = this._joystick.checkPointer();
             if (this._player.direction != result.direction) {
@@ -206,17 +209,12 @@ var TheGame = (function () {
         else {
             message = this._player.updateTank(this.game.input.activePointer.isDown);
         }
-        this._socket.emit(TankUpdateEventName, message);
-        // Then, check collision.
+        // 2. check collision.
         var hitMessage = TheGame.combat(this.game, this._player, this._enemies);
-        if (hitMessage != undefined) {
-            this._socket.emit(HitEventName, hitMessage);
-        }
-        if (this._player.blood <= 0) {
-            this._player._gameOver = true;
-            TankHelper.onExplode(this._player);
-        }
-        // Finally, update minimap.
+        // 3. Message.
+        Socket.sendMessage(this._socket, TankUpdateEventName, message);
+        Socket.sendMessage(this._socket, HitEventName, hitMessage);
+        // 4. Update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     };
     TheGame.combat = function (game, player, others) {
@@ -236,6 +234,7 @@ var TheGame = (function () {
         });
         return hitMessage;
     };
+    // set-ups
     TheGame.setupPlayer = function (self) {
         var x = Math.floor(GameWidth * Math.random());
         var y = Math.floor(GameHeight * Math.random());
@@ -245,10 +244,26 @@ var TheGame = (function () {
     };
     TheGame.setupBackground = function (game) {
         game.world.setBounds(0, 0, GameWidth, GameHeight);
-        DrawHelpers.drawGrids(game.add.graphics(0, 0), GameWidth, GameHeight);
+        TheGame.drawGrids(game.add.graphics(0, 0), GameWidth, GameHeight);
         var deadzoneOffsetX = Math.abs(Math.floor(game.width / 2.3));
         var deadzoneOffsetY = Math.abs(Math.floor(game.height / 2.3));
         game.camera.deadzone = new Phaser.Rectangle(deadzoneOffsetX, deadzoneOffsetY, game.width - deadzoneOffsetX * 2, game.height - deadzoneOffsetY * 2);
+    };
+    TheGame.drawGrids = function (graphics, width, height) {
+        var hnum = Math.floor(width / GridWidth);
+        var vnum = Math.floor(height / GridHeight);
+        graphics.lineStyle(2, 0xE03F00, 1);
+        for (var i = 2; i < hnum - 2; i++) {
+            var x = i * GridWidth;
+            graphics.moveTo(x, 0);
+            graphics.lineTo(x, height);
+        }
+        graphics.lineStyle(2, 0x00E05E, 1);
+        for (var i = 2; i < vnum - 2; i++) {
+            var y = i * GridHeight;
+            graphics.moveTo(0, y);
+            graphics.lineTo(width, y);
+        }
     };
     TheGame.setupForeground = function (self) {
         self._miniMap = new MiniMap(self.game, self._player);
@@ -259,7 +274,7 @@ var TheGame = (function () {
     };
     return TheGame;
 }());
-applyMixins(TheGame, [GameSocket, Inputs]);
+applyMixins(TheGame, [Socket, Inputs]);
 // class GunTower implements Shoot {
 //     _tower: Phaser.Sprite;
 //     constructor(game: Phaser.Game, x: number, y: number) {
@@ -281,28 +296,134 @@ applyMixins(TheGame, [GameSocket, Inputs]);
 //     calculateTrajectory: () => Trajectory;
 //     fireInternal: (startX: number, startY: number, moveToX: number, moveToY: number) => void;
 // } 
-/// <reference path="../.ts_dependencies/phaser.d.ts" />
-var DrawHelpers = (function () {
-    function DrawHelpers() {
+function applyMixins(derivedCtor, baseCtors) {
+    baseCtors.forEach(function (baseCtor) {
+        Object.getOwnPropertyNames(baseCtor.prototype).forEach(function (name) {
+            derivedCtor.prototype[name] = baseCtor.prototype[name];
+        });
+    });
+}
+var MobileChecker = (function () {
+    function MobileChecker() {
     }
-    DrawHelpers.drawGrids = function (graphics, width, height) {
-        var hnum = Math.floor(width / GridWidth);
-        var vnum = Math.floor(height / GridHeight);
-        graphics.lineStyle(2, 0xE03F00, 1);
-        for (var i = 2; i < hnum - 2; i++) {
-            var x = i * GridWidth;
-            graphics.moveTo(x, 0);
-            graphics.lineTo(x, height);
-        }
-        graphics.lineStyle(2, 0x00E05E, 1);
-        for (var i = 2; i < vnum - 2; i++) {
-            var y = i * GridHeight;
-            graphics.moveTo(0, y);
-            graphics.lineTo(width, y);
+    MobileChecker.Android = function () {
+        return navigator.userAgent.match(/Android/i);
+    };
+    MobileChecker.BlackBerry = function () {
+        return navigator.userAgent.match(/BlackBerry/i);
+    };
+    MobileChecker.iOS = function () {
+        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
+    };
+    MobileChecker.Opera = function () {
+        return navigator.userAgent.match(/Opera Mini/i);
+    };
+    MobileChecker.Windows = function () {
+        return navigator.userAgent.match(/IEMobile/i);
+    };
+    MobileChecker.isMobile = function () {
+        return (MobileChecker.Android() || MobileChecker.BlackBerry() || MobileChecker.iOS() || MobileChecker.Opera() || MobileChecker.Windows());
+    };
+    return MobileChecker;
+}());
+;
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
+var DriveHelpers = (function () {
+    function DriveHelpers() {
+    }
+    DriveHelpers.addDirectionIntegral = function (tank, addDirection) {
+        var newDirection = DriveHelpers.addDirection(tank.direction, addDirection);
+        tank.drive(newDirection);
+    };
+    DriveHelpers.removeDirectionIntegral = function (tank, removeDirection) {
+        var newDirection = DriveHelpers.removeDirection(tank.direction, removeDirection);
+        tank.drive(newDirection);
+    };
+    DriveHelpers.directionToAngle = function (direction) {
+        switch (direction) {
+            case Directions.Up:
+                return 0;
+            case Directions.Down:
+                return 180;
+            case Directions.Left:
+                return -90;
+            case Directions.Right:
+                return 90;
+            case Directions.UpLeft:
+                return -45;
+            case Directions.DownLeft:
+                return 225;
+            case Directions.UpRight:
+                return 45;
+            case Directions.DownRight:
+                return 135;
+            default:
+                return undefined;
         }
     };
-    return DrawHelpers;
+    DriveHelpers.addDirection = function (direction, addDirection) {
+        // If direction alread has the added direction, just return. This case may barely happen.
+        if ((direction & addDirection) != 0) {
+            return Directions.None;
+        }
+        var opsiteDirection = DriveHelpers.getOpsiteDirection(addDirection);
+        if ((direction & opsiteDirection) != 0) {
+            return direction = direction & (~opsiteDirection);
+        }
+        return direction | addDirection;
+    };
+    DriveHelpers.removeDirection = function (direction, removeDirection) {
+        return direction & (~removeDirection);
+    };
+    DriveHelpers.getOpsiteDirection = function (direction) {
+        switch (direction) {
+            case Directions.Up: return Directions.Down;
+            case Directions.Down: return Directions.Up;
+            case Directions.Left: return Directions.Right;
+            case Directions.Right: return Directions.Left;
+        }
+        return Directions.None;
+    };
+    DriveHelpers.setAcceleration = function (angle, acceleration, maxVelocity) {
+        var angleRad = Phaser.Math.degToRad(angle);
+        var sinAngle = Math.sin(angleRad);
+        var negCosAngle = 0 - Math.cos(angleRad);
+        acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
+        maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
+    };
+    return DriveHelpers;
 }());
+var TankHelper = (function () {
+    function TankHelper() {
+    }
+    TankHelper.onExplode = function (self) {
+        // If already exploded, return.
+        if (self._gameOver) {
+            return;
+        }
+        // Emit and destroy everything.
+        var emitter = self._ownerGame.add.emitter(self.body.position.x, self.body.position.y);
+        emitter.makeParticles(ParticleName, 0, 200, true, false);
+        emitter.explode(2000, 200);
+        self._guntower.destroy();
+        self._bloodText.destroy();
+        self._bullets.destroy();
+        self.destroy();
+    };
+    TankHelper.onHitVisual = function (bullet, tankBody, game) {
+        // Now we are creating the particle emitter, centered to the world
+        var hitX = (bullet.x + tankBody.body.x) / 2;
+        var hitY = (bullet.y + tankBody.body.y) / 2;
+        bullet.kill();
+        // Get effect.
+        var emitter = game.add.emitter(hitX, hitY);
+        emitter.makeParticles(ParticleName, 0, 50, false, false);
+        emitter.explode(1000, 50);
+        return { hitX: hitX, hitY: hitY };
+    };
+    return TankHelper;
+}());
+/// <reference path="../.ts_dependencies/phaser.d.ts" />
 var Joystick = (function () {
     function Joystick(game) {
         this._r = 200;
@@ -375,135 +496,6 @@ var Joystick = (function () {
         return Directions.None;
     };
     return Joystick;
-}());
-/// <reference path="../.ts_dependencies/phaser.d.ts" />
-var DriveHelpers = (function () {
-    function DriveHelpers() {
-    }
-    DriveHelpers.addDirectionIntegral = function (tank, addDirection) {
-        var newDirection = DriveHelpers.addDirection(tank.direction, addDirection);
-        tank.drive(newDirection);
-    };
-    DriveHelpers.removeDirectionIntegral = function (tank, removeDirection) {
-        var newDirection = DriveHelpers.removeDirection(tank.direction, removeDirection);
-        tank.drive(newDirection);
-    };
-    DriveHelpers.directionToAngle = function (direction) {
-        switch (direction) {
-            case Directions.Up:
-                return 0;
-            case Directions.Down:
-                return 180;
-            case Directions.Left:
-                return -90;
-            case Directions.Right:
-                return 90;
-            case Directions.UpLeft:
-                return -45;
-            case Directions.DownLeft:
-                return 225;
-            case Directions.UpRight:
-                return 45;
-            case Directions.DownRight:
-                return 135;
-            default:
-                return undefined;
-        }
-    };
-    DriveHelpers.addDirection = function (direction, addDirection) {
-        // If direction alread has the added direction, just return. This case may barely happen.
-        if ((direction & addDirection) != 0) {
-            return Directions.None;
-        }
-        var opsiteDirection = DriveHelpers.getOpsiteDirection(addDirection);
-        if ((direction & opsiteDirection) != 0) {
-            return direction = direction & (~opsiteDirection);
-        }
-        return direction | addDirection;
-    };
-    DriveHelpers.removeDirection = function (direction, removeDirection) {
-        return direction & (~removeDirection);
-    };
-    DriveHelpers.getOpsiteDirection = function (direction) {
-        switch (direction) {
-            case Directions.Up: return Directions.Down;
-            case Directions.Down: return Directions.Up;
-            case Directions.Left: return Directions.Right;
-            case Directions.Right: return Directions.Left;
-        }
-        return Directions.None;
-    };
-    DriveHelpers.setAcceleration = function (angle, acceleration, maxVelocity) {
-        var angleRad = Phaser.Math.degToRad(angle);
-        var sinAngle = Math.sin(angleRad);
-        var negCosAngle = 0 - Math.cos(angleRad);
-        acceleration.setTo(Acceleration * sinAngle, Acceleration * negCosAngle);
-        maxVelocity.setTo(Math.abs(MaxVelocity * sinAngle), Math.abs(MaxVelocity * negCosAngle));
-    };
-    return DriveHelpers;
-}());
-function applyMixins(derivedCtor, baseCtors) {
-    baseCtors.forEach(function (baseCtor) {
-        Object.getOwnPropertyNames(baseCtor.prototype).forEach(function (name) {
-            derivedCtor.prototype[name] = baseCtor.prototype[name];
-        });
-    });
-}
-// TODO: Make it more like ts.
-var MobileChecker = (function () {
-    function MobileChecker() {
-    }
-    MobileChecker.Android = function () {
-        return navigator.userAgent.match(/Android/i);
-    };
-    MobileChecker.BlackBerry = function () {
-        return navigator.userAgent.match(/BlackBerry/i);
-    };
-    MobileChecker.iOS = function () {
-        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
-    };
-    MobileChecker.Opera = function () {
-        return navigator.userAgent.match(/Opera Mini/i);
-    };
-    MobileChecker.Windows = function () {
-        return navigator.userAgent.match(/IEMobile/i);
-    };
-    MobileChecker.isMobile = function () {
-        return (MobileChecker.Android() || MobileChecker.BlackBerry() || MobileChecker.iOS() || MobileChecker.Opera() || MobileChecker.Windows());
-    };
-    return MobileChecker;
-}());
-;
-var TankHelper = (function () {
-    function TankHelper() {
-    }
-    TankHelper.onExplode = function (self) {
-        // If already exploded, return.
-        if (self._gameOver) {
-            return;
-        }
-        // Emit and destroy everything.
-        var emitter = self._ownerGame.add.emitter(self.body.position.x, self.body.position.y);
-        emitter.makeParticles(ParticleName, 0, 200, true, false);
-        emitter.explode(2000, 200);
-        self._guntower.destroy();
-        self._bloodText.destroy();
-        self._bullets.destroy();
-        self.destroy();
-        self.game.destroy();
-    };
-    TankHelper.onHitVisual = function (bullet, tankBody, game) {
-        // Now we are creating the particle emitter, centered to the world
-        var hitX = (bullet.x + tankBody.body.x) / 2;
-        var hitY = (bullet.y + tankBody.body.y) / 2;
-        bullet.kill();
-        // Get effect.
-        var emitter = game.add.emitter(hitX, hitY);
-        emitter.makeParticles(ParticleName, 0, 50, false, false);
-        emitter.explode(1000, 50);
-        return { hitX: hitX, hitY: hitY };
-    };
-    return TankHelper;
 }());
 var MiniMap = (function () {
     function MiniMap(game, player) {
@@ -630,10 +622,10 @@ var Shoot = (function () {
         var halfLength = this._guntower.height / 2;
         var sinTheta = Math.sin(theta);
         var reverseCosTheta = -1 * Math.cos(theta);
-        var tankPosition = this._guntower.parent.body.center;
+        var position = this._guntower.parent.body.center;
         // Bullet start position and move to position.
-        var startX = sinTheta * halfLength + tankPosition.x;
-        var startY = reverseCosTheta * halfLength + tankPosition.y;
+        var startX = sinTheta * halfLength + position.x;
+        var startY = reverseCosTheta * halfLength + position.y;
         var moveToX = startX + sinTheta * Number.MAX_VALUE;
         var moveToY = startY + reverseCosTheta * Number.MAX_VALUE;
         return { theta: theta, sinTheta: sinTheta, reverseCosTheta: reverseCosTheta,
@@ -672,14 +664,12 @@ var Tank = (function (_super) {
         }
         // 1. Gun points to pointer.
         this.updateAngle();
-        // 2. Update blood.
-        this._bloodText.text = this.blood;
-        // 3. Fire.
+        // 2. Fire.
         var fire = undefined;
         if (shouldFire) {
             fire = this.fire(undefined);
         }
-        // 4. Get result.
+        // Return.
         return this.getJson(fire);
     };
     Tank.prototype.updateAsPuppet = function (params) {
@@ -771,6 +761,11 @@ var Tank = (function (_super) {
         this.blood -= Math.floor(Math.random() * Damage);
         var self = this;
         var result = TankHelper.onHitVisual(bullet, self, this._ownerGame);
+        // Only check & explode here.
+        if (this.blood <= 0) {
+            this._gameOver = true;
+            TankHelper.onExplode(self);
+        }
         return {
             tankId: this.id,
             hitX: result.hitX,
