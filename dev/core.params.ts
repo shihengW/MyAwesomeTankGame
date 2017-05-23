@@ -10,6 +10,7 @@ const GridHeight = 50;
 const GridWidth = 90;
 const GameHeight = 3000;
 const GameWidth = 3000;
+const ShadowRadius = 300;
 
 // Names
 const SandbagName: string = "sandbag";

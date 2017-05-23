@@ -1,7 +1,7 @@
 ﻿/// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
-class TheGame implements Socket, Inputs {
+class TheGame implements Socket, Inputs, Torch {
     game: Phaser.Game;
     _miniMap: MiniMap;
     _joystick: Joystick;
@@ -33,6 +33,7 @@ class TheGame implements Socket, Inputs {
         TheGame.setupPlayer(self);
         TheGame.prototype.setupSocket(self);
         TheGame.setupForeground(self);
+        TheGame.prototype.createTorch.call(self, self.game);
     }
 
     update() {
@@ -57,7 +58,11 @@ class TheGame implements Socket, Inputs {
         message.blood = this._player.blood;
         Socket.sendMessage(this._socket, TankUpdateEventName, message);
 
-        // 4. Update minimap.
+        // 4. Update torch.
+        TheGame.prototype.updateTorch.call(this, this._player.body.position, 
+            this._player.rotation + this._player._guntower.rotation);
+        
+        // 5. Update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     }
 
@@ -148,6 +153,14 @@ class TheGame implements Socket, Inputs {
     static registerKeyInputs: (self: any, key: number, keydownHandler: any, keyupHandler?: any) => void;
     static mapKeyToDirection: (key: any) => Directions;
 //
+
+// Mixin-Torch
+    _shadowTexture: Phaser.BitmapData;
+    _torch: Phaser.Image;
+
+    createTorch: (game: Phaser.Game) => void;
+    updateTorch: (position: Phaser.Point) => void;
+//
 }
 
-applyMixins(TheGame, [Socket, Inputs]);
+applyMixins(TheGame, [Socket, Inputs, Torch]);

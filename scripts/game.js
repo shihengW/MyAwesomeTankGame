@@ -20,6 +20,7 @@ var GridHeight = 50;
 var GridWidth = 90;
 var GameHeight = 3000;
 var GameWidth = 3000;
+var ShadowRadius = 300;
 // Names
 var SandbagName = "sandbag";
 var TankbodyName = "tankbody";
@@ -169,6 +170,35 @@ var Socket = (function () {
     };
     return Socket;
 }());
+var Torch = (function () {
+    function Torch() {
+    }
+    Torch.prototype.createTorch = function (game) {
+        this.game = game;
+        this._shadowTexture = game.add.bitmapData(this.game.width, this.game.height);
+        this._torch = this.game.add.image(0, 0, this._shadowTexture);
+        this._torch.fixedToCamera = true;
+        this._torch.blendMode = Phaser.blendModes.MULTIPLY;
+    };
+    // TODO: Draw a torch instead of a circle.
+    Torch.prototype.updateTorch = function (position, angle) {
+        var truncatedX = position.x - this.game.camera.x;
+        var truncatedY = position.y - this.game.camera.y;
+        this._shadowTexture.context.fillStyle = 'rgb(80, 80, 80)';
+        this._shadowTexture.context.fillRect(0, 0, this.game.width, this.game.height);
+        // Draw circle of light with a soft edge
+        var gradient = this._shadowTexture.context.createRadialGradient(truncatedX, truncatedY, ShadowRadius * 0.5, truncatedX, truncatedY, ShadowRadius);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+        this._shadowTexture.context.beginPath();
+        this._shadowTexture.context.fillStyle = gradient;
+        this._shadowTexture.context.arc(truncatedX, truncatedY, ShadowRadius, 0, Math.PI * 2);
+        this._shadowTexture.context.fill();
+        // This just tells the engine it should update the texture cache
+        this._shadowTexture.dirty = true;
+    };
+    return Torch;
+}());
 /// <reference path="../.ts_dependencies/pixi.d.ts" />
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
@@ -195,6 +225,7 @@ var TheGame = (function () {
         TheGame.setupPlayer(self);
         TheGame.prototype.setupSocket(self);
         TheGame.setupForeground(self);
+        TheGame.prototype.createTorch.call(self, self.game);
     };
     TheGame.prototype.update = function () {
         var message = undefined;
@@ -214,7 +245,9 @@ var TheGame = (function () {
         // 3. Send message.
         message.blood = this._player.blood;
         Socket.sendMessage(this._socket, TankUpdateEventName, message);
-        // 4. Update minimap.
+        // 4. Update torch.
+        TheGame.prototype.updateTorch.call(this, this._player.body.position, this._player.rotation + this._player._guntower.rotation);
+        // 5. Update minimap.
         this._miniMap.updateMap(this._player.direction != Directions.None);
     };
     TheGame.combat = function (game, player, others) {
@@ -274,7 +307,7 @@ var TheGame = (function () {
     };
     return TheGame;
 }());
-applyMixins(TheGame, [Socket, Inputs]);
+applyMixins(TheGame, [Socket, Inputs, Torch]);
 // class GunTower implements Shoot {
 //     _tower: Phaser.Sprite;
 //     constructor(game: Phaser.Game, x: number, y: number) {
@@ -453,13 +486,13 @@ var MiniMap = (function () {
         if (show || this._isBlinkingEnemy) {
             if (!this._show) {
                 this._show = true;
-                this._graphicsOuter.beginFill(0x4D5300, 0.5);
+                this._graphicsOuter.beginFill(0xFFFFFF, 0.9);
                 this._graphicsOuter.lineStyle(1, 0x4D5359, 0.5);
                 this._graphicsOuter.drawRect(this._offsets.x, this._offsets.y, this._bounds.x, this._bounds.y);
                 this._graphicsOuter.endFill();
             }
             var spot = this.getPlayer();
-            this._graphicsPlayer.lineStyle(4, 0x00AF00, 0.8);
+            this._graphicsPlayer.lineStyle(4, 0x00AF00, 1);
             this._graphicsPlayer.drawRect(spot.x, spot.y, 4, 4);
         }
         else {
@@ -473,7 +506,7 @@ var MiniMap = (function () {
             this.updateMap(true);
         }
         var spot = this.getPositionCore(x, y);
-        this._graphicsEnemy.lineStyle(4, 0xAF0000, 0.8);
+        this._graphicsEnemy.lineStyle(4, 0xAF0000, 1);
         this._graphicsEnemy.drawRect(spot.x, spot.y, 4, 4);
         var self = this;
         setTimeout(function () {
