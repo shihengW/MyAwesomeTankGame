@@ -55,7 +55,7 @@ class TheGame implements Socket, Inputs, Torch {
 
         // 3. Send message.
         message.blood = this._player.blood;
-        Socket.sendMessage(this._socket, TankUpdateEventName, message);
+        TheGame.prototype.sendMessage.call(this, TankUpdateEventName, message);
 
         // 4. Update torch.
         TheGame.prototype.updateTorch.call(this, this._player.body.position, 
@@ -138,10 +138,10 @@ class TheGame implements Socket, Inputs, Torch {
     _socket: any;
     _enemies: Tank[];
     setupSocket: (self: TheGame) => void;
-    static getOrAddEnemy: (self: TheGame, enemy: IdMessage) => Tank;
-    static updateEnemyByJson: (self: TheGame, enemy: FullMessage) => void;
-    static removeEnemyByJson: (self: TheGame, enemy: IdMessage) => Tank;
-    static sendMessage: (socket: SocketIOClient.Socket, messageName: string, message: any) => void;
+    sendMessage: (messageName: string, message: any) => void;
+    private static getOrAddEnemy: (self: TheGame, enemy: IdMessage) => Tank;
+    private static updateEnemyByJson: (self: TheGame, enemy: FullMessage) => void;
+    private static removeEnemyByJson: (self: TheGame, enemy: IdMessage) => Tank;
 //
 
 // Mixin-Inputs

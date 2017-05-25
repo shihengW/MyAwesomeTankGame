@@ -124,9 +124,9 @@ var Socket = (function () {
         });
         self._socket.emit(AddNewEventName, self._player.getJson(undefined));
     };
-    Socket.sendMessage = function (socket, messageName, message) {
+    Socket.prototype.sendMessage = function (messageName, message) {
         if (message != undefined) {
-            socket.emit(messageName, message);
+            this._socket.emit(messageName, message);
         }
     };
     Socket.updateEnemyByJson = function (self, enemy) {
@@ -244,7 +244,7 @@ var TheGame = (function () {
         var hitMessage = TheGame.combat(this.game, this._player, this._enemies);
         // 3. Send message.
         message.blood = this._player.blood;
-        Socket.sendMessage(this._socket, TankUpdateEventName, message);
+        TheGame.prototype.sendMessage.call(this, TankUpdateEventName, message);
         // 4. Update torch.
         TheGame.prototype.updateTorch.call(this, this._player.body.position, this._player.rotation + this._player._guntower.rotation);
         // 5. Update minimap.

@@ -26,18 +26,18 @@ class Socket {
         self._socket.emit(AddNewEventName, self._player.getJson(undefined));
     }
 
-    static sendMessage(socket: SocketIOClient.Socket, messageName: string, message: any) {
+    sendMessage(messageName: string, message: any) {
         if (message != undefined) {
-            socket.emit(messageName, message);
+            this._socket.emit(messageName, message);
         }
     }
 
-    static updateEnemyByJson(self: TheGame, enemy: FullMessage) {
+    private static updateEnemyByJson(self: TheGame, enemy: FullMessage) {
         let tank = Socket.getOrAddEnemy(self, enemy);
         tank.updateAsPuppet(enemy)
     }
 
-    static removeEnemyByJson(self: TheGame, enemy: IdMessage): Tank {
+    private static removeEnemyByJson(self: TheGame, enemy: IdMessage): Tank {
         // TODO: Refactor these ugly logic.
         let foundTank: Tank = undefined;
         self._enemies.forEach(item => {
@@ -52,7 +52,7 @@ class Socket {
         return foundTank;
     }
 
-    static getOrAddEnemy(self: TheGame, enemy: IdMessage) : Tank {
+    private static getOrAddEnemy(self: TheGame, enemy: IdMessage) : Tank {
         let tank: Tank = undefined;
         if (self._enemies == undefined) {
             tank = Tank.create(self.game, enemy.tankId, 0, 0)
