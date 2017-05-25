@@ -2,7 +2,6 @@
 /// <reference path="../.ts_dependencies/phaser.d.ts" />
 /// <reference path="../.ts_dependencies/socket.io-client.d.ts" />
 class TheGame implements Socket, Inputs, Torch {
-    game: Phaser.Game;
     _miniMap: MiniMap;
     _joystick: Joystick;
 
@@ -147,11 +146,12 @@ class TheGame implements Socket, Inputs, Torch {
 
 // Mixin-Inputs
     _player: Tank;
+    game: Phaser.Game;
     setupKeys: (self: TheGame) => void;
-    onKeyDown: (e: Phaser.Key) => void;
-    onKeyUp: (e: Phaser.Key) => void;
-    static registerKeyInputs: (self: any, key: number, keydownHandler: any, keyupHandler?: any) => void;
-    static mapKeyToDirection: (key: any) => Directions;
+    private registerKeyInputs: (key: number, keydownHandler: any, keyupHandler?: any) => void;
+    private onKeyDown: (e: Phaser.Key) => void;
+    private onKeyUp: (e: Phaser.Key) => void;
+    private static mapKeyToDirection: (key: any) => Directions;
 //
 
 // Mixin-Torch

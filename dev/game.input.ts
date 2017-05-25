@@ -1,32 +1,33 @@
 class Inputs {
     _player: Tank;
+    game: Phaser.Game;
 
     setupKeys(self: TheGame) {
         for (let key of [ Phaser.Keyboard.W, Phaser.Keyboard.A, 
                           Phaser.Keyboard.S, Phaser.Keyboard.D, 
                           Phaser.Keyboard.UP, Phaser.Keyboard.LEFT, 
                           Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT ]) {
-            Inputs.registerKeyInputs(self, key, Inputs.prototype.onKeyDown, Inputs.prototype.onKeyUp);
+            Inputs.prototype.registerKeyInputs.call(self, key, Inputs.prototype.onKeyDown, Inputs.prototype.onKeyUp);
         }
     }
 
-    onKeyDown(e: Phaser.Key) {
+    private onKeyDown(e: Phaser.Key) {
         let addDirection = Inputs.mapKeyToDirection(e.event.key);
         this._player.addDirection(addDirection);
     }
 
-    onKeyUp(e: Phaser.Key) {
+    private onKeyUp(e: Phaser.Key) {
         let removeDirection = Inputs.mapKeyToDirection(e.event.key);
         this._player.removeDirection(removeDirection);
     }
     
-    static registerKeyInputs(self: any, key: number, keydownHandler: any, keyupHandler?: any) {
-        let realKey = self.game.input.keyboard.addKey(key);
-        if (keydownHandler != null) realKey.onDown.add(keydownHandler, self);
-        if (keyupHandler != null) realKey.onUp.add(keyupHandler, self);
+    private registerKeyInputs(key: number, keydownHandler: any, keyupHandler?: any) {
+        let realKey = this.game.input.keyboard.addKey(key);
+        if (keydownHandler != null) realKey.onDown.add(keydownHandler, this);
+        if (keyupHandler != null) realKey.onUp.add(keyupHandler, this);
     }
 
-    static mapKeyToDirection(key: any) : Directions {
+    private static mapKeyToDirection(key: any) : Directions {
         let direction: Directions = Directions.None;
         switch (key) {
             case "w": 

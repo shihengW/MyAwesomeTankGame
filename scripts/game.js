@@ -59,7 +59,7 @@ var Inputs = (function () {
             Phaser.Keyboard.UP, Phaser.Keyboard.LEFT,
             Phaser.Keyboard.DOWN, Phaser.Keyboard.RIGHT]; _i < _a.length; _i++) {
             var key = _a[_i];
-            Inputs.registerKeyInputs(self, key, Inputs.prototype.onKeyDown, Inputs.prototype.onKeyUp);
+            Inputs.prototype.registerKeyInputs.call(self, key, Inputs.prototype.onKeyDown, Inputs.prototype.onKeyUp);
         }
     };
     Inputs.prototype.onKeyDown = function (e) {
@@ -70,12 +70,12 @@ var Inputs = (function () {
         var removeDirection = Inputs.mapKeyToDirection(e.event.key);
         this._player.removeDirection(removeDirection);
     };
-    Inputs.registerKeyInputs = function (self, key, keydownHandler, keyupHandler) {
-        var realKey = self.game.input.keyboard.addKey(key);
+    Inputs.prototype.registerKeyInputs = function (key, keydownHandler, keyupHandler) {
+        var realKey = this.game.input.keyboard.addKey(key);
         if (keydownHandler != null)
-            realKey.onDown.add(keydownHandler, self);
+            realKey.onDown.add(keydownHandler, this);
         if (keyupHandler != null)
-            realKey.onUp.add(keyupHandler, self);
+            realKey.onUp.add(keyupHandler, this);
     };
     Inputs.mapKeyToDirection = function (key) {
         var direction = Directions.None;
